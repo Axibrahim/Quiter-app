@@ -2,7 +2,9 @@
  * Shared responsive navbar.
  *
  * Desktop: keeps the existing navbar layout.
- * Mobile: moves links and auth actions into a glass dropdown panel.
+ * Mobile: moves nav links into a glass dropdown panel. The auth/user
+ * area (login buttons or the username pill) stays visible in the bar
+ * next to the menu toggle rather than being hidden inside the panel.
  */
 
 function initMobileNav() {
@@ -43,8 +45,9 @@ function initMobileNav() {
 
   toggle.innerHTML = menuIcon;
 
-  // Move the existing links and auth controls into the dropdown.
-  panel.append(navLinks, navRight);
+  // Move only the nav links into the dropdown. The auth/user area
+  // (navRight) stays put in the bar so the username stays visible.
+  panel.append(navLinks);
   pill.append(panel, toggle);
 
   const closeMenu = () => {

@@ -88,7 +88,7 @@
 .hero {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -1847,25 +1847,25 @@ main,
     color: var(--ink);
     opacity: 1;
   }
-
+  
   .nav__right {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: stretch;
+    align-items: center;
+    flex-wrap: nowrap;
     gap: 0.5rem;
-    width: 100%;
-    padding-top: 0.7rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    margin-left: auto;
   }
 
   .nav__right .btn {
-    flex: 1;
-    min-width: 7rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
   }
 
   .nav__menu-toggle {
     display: inline-flex;
-    margin-left: auto;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
   }
 }
 
@@ -1982,7 +1982,7 @@ main,
 .plans-hero-swiper {
   position: relative;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   padding-bottom: var(--space-4, 2rem);
