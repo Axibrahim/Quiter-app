@@ -121,9 +121,11 @@ function renderHeroSlide(template) {
   slide.className = 'plans-swiper__slide';
   slide.dataset.slug = template.slug || '';
 
+  const hasPhoto = Boolean(template.photo_url);
+
   slide.innerHTML = `
     <div class="plans-swiper__photo-wrap" style="--plan-glow: ${glow};">
-      <img class="plans-swiper__photo" src="${template.photo_url || getPlanPhoto(template)}" alt="" loading="lazy" />
+      ${hasPhoto ? `<img class="plans-swiper__photo" src="${template.photo_url}" alt="" loading="lazy" />` : ''}
       <div class="plans-swiper__glyph" aria-hidden="true">${template.glyph || getCategoryGlyph(template.category, template.direction)}</div>
     </div>
     <div class="plans-swiper__scrim"></div>
@@ -144,9 +146,12 @@ function renderHeroSlide(template) {
     </div>
   `;
 
-  slide.querySelector('.plans-swiper__photo')
-    ?.addEventListener('error', () => slide.classList.add('plans-swiper__slide--noimg'), { once: true });
-
+  if (!hasPhoto) {
+    slide.classList.add('plans-swiper__slide--noimg');
+  } else {
+    slide.querySelector('.plans-swiper__photo')
+      ?.addEventListener('error', () => slide.classList.add('plans-swiper__slide--noimg'), { once: true });
+  }
   slide.querySelector('[data-adopt-btn]')?.addEventListener('click', () => handleAdopt(template));
   return slide;
 }
@@ -290,7 +295,7 @@ async function loadCatalog() {
   } finally {
     if (loading) loading.style.display = 'none';
     applyFilters();
-    renderHeroswiper();
+    renderHeroSwiper();
   }
 }
 
