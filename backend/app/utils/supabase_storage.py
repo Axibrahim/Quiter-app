@@ -45,6 +45,7 @@ def upload_plan_photo(file_bytes: bytes, content_type: str) -> str:
         upload_url,
         headers={
             "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+            "apikey": SUPABASE_SERVICE_ROLE_KEY,
             "Content-Type": content_type,
             "x-upsert": "false",
         },
@@ -53,6 +54,7 @@ def upload_plan_photo(file_bytes: bytes, content_type: str) -> str:
     )
 
     if resp.status_code not in (200, 201):
-        raise SupabaseStorageError("upload_failed")
-
+        # Surface Supabase's actual error so we can diagnose config issues
+        # (bad key, wrong bucket name, etc.) instead of a generic failure.
+        raise SupabaseStorageError(f"upload_failed: {resp.status_code} {resp.text[:300]}")
     return f"{SUPABASE_URL}/storage/v1/object/public/{PLAN_PHOTOS_BUCKET}/{object_path}"

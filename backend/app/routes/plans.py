@@ -21,6 +21,13 @@ plans_bp = Blueprint("plans", __name__, url_prefix="/api/v1/plans")
 
 REMINDER_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 SUPPORT_STYLES = {"gentle", "focused", "reflective"}
+MAX_ACTIVE_PLANS = 3
+
+
+def _active_plan_count(user_id):
+    return UserPlan.query.filter_by(
+        user_id=user_id, is_completed=False, is_abandoned=False
+    ).count()
 
 
 def _read_custom_settings(payload):
@@ -205,6 +212,9 @@ def adopt_plan():
     if existing:
         return jsonify({"error": "plan_already_active", "user_plan_id": existing.id}), 409
 
+    if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
+        return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
+
     user_plan = UserPlan(user_id=g.current_user.id, template_id=template_id, start_date=date.today())
     db.session.add(user_plan)
     db.session.commit()
@@ -329,6 +339,9 @@ def create_custom_plan():
     settings, error = _read_custom_settings(payload)
     if error:
         return jsonify({"error": error}), 400
+
+    if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
+        return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
     (
         length_days,
