@@ -48,7 +48,17 @@ function initMobileNav() {
   // Move only the nav links into the dropdown. The auth/user area
   // (navRight) stays put in the bar so the username stays visible.
   panel.append(navLinks);
-  pill.append(panel, toggle);
+
+  // The panel is appended to the <header class="nav">, NOT the pill.
+  // .nav__pill carries the shared .liquid-glass class, which sets
+  // overflow: hidden (needed for its shine-reflection effect) — if the
+  // dropdown lived inside the pill, that overflow would clip it
+  // completely invisible even while correctly "open". The header itself
+  // has no overflow restriction, so the panel escapes the clipping while
+  // still positioning right under the pill.
+  const navHeader = pill.closest('.nav') || pill.parentElement;
+  pill.append(toggle);
+  navHeader.append(panel);
 
   const closeMenu = () => {
     panel.classList.remove('is-open');
@@ -79,7 +89,7 @@ function initMobileNav() {
   });
 
   document.addEventListener('click', (event) => {
-    if (!pill.contains(event.target)) {
+    if (!navHeader.contains(event.target)) {
       closeMenu();
     }
   });

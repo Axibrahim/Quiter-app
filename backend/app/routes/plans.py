@@ -116,6 +116,9 @@ def my_plans():
         already_logged = DailyLog.query.filter_by(user_plan_id=up.id, log_date=date.today()).first()
         out.append({
             "user_plan_id": up.id,
+            "template_id": up.template_id,
+            "category": up.template.category,
+            "photo_url": up.template.photo_url,
             "title": up.template.title,
             "identity_statement": up.template.identity_statement,
             "direction": up.template.direction.value,

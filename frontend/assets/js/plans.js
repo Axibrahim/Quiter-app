@@ -103,8 +103,8 @@ function renderPlanCard(template) {
         <span>${template.length_days} days</span>
         <span>${template.active_count || 'Active now'}</span>
         </div>
-      <button class="liquid-glass btn btn--glass plan-card__choose" data-adopt-btn type="button">Choose this plan</button>
-    </div>
+          <button class="liquid-glass btn btn--glass plan-card__choose" data-adopt-btn type="button">${template.enrolled ? 'Continue plan' : 'Choose this plan'}</button>
+        </div>
   `;
 
   card.querySelector('[data-adopt-btn]')?.addEventListener('click', () => handleAdopt(template));
@@ -114,7 +114,7 @@ function renderPlanCard(template) {
 
 function renderHeroSlide(template) {
   const glow = template.glow || getCategoryGlow(template.direction);
-  const ctaText = template.cta_text || 'Start Your Journey';
+  const ctaText = template.enrolled ? 'Continue plan' : (template.cta_text || 'Start Your Journey');
   const bodyText = template.description || template.identity_statement;
 
   const slide = document.createElement('div');
@@ -279,6 +279,49 @@ function applyFilters() {
   initGlassHover();
 }
 
+async function mergeEnrollments() {
+  if (!getCurrentUser()) return;
+
+  let mine = [];
+  try {
+    mine = await api.get('/plans/mine');
+  } catch {
+    return; // not logged in / network hiccup — catalog still renders without enrollment state
+  }
+
+  const active = mine.filter((p) => !p.is_completed && !p.is_abandoned);
+  const byTemplateId = new Map(active.map((p) => [p.template_id, p]));
+
+  allTemplates = allTemplates.map((t) => {
+    const mineEntry = byTemplateId.get(t.id);
+    return mineEntry
+      ? { ...t, enrolled: true, user_plan_id: mineEntry.user_plan_id }
+      : t;
+  });
+
+  // Custom plans are marked is_active=false on the backend so they never
+  // appear in the public /templates catalog — surface the user's own
+  // enrolled custom plans here so they still show up in this page.
+  const catalogIds = new Set(allTemplates.map((t) => t.id));
+  const customPlans = active
+    .filter((p) => p.category === 'custom' && !catalogIds.has(p.template_id))
+    .map((p) => ({
+      id: p.template_id,
+      slug: p.template_id,
+      title: p.title,
+      identity_statement: p.identity_statement,
+      direction: p.direction,
+      category: p.category,
+      length_days: p.total_days,
+      photo_url: p.photo_url,
+      description: 'Your custom plan.',
+      enrolled: true,
+      user_plan_id: p.user_plan_id,
+    }));
+
+  allTemplates = [...allTemplates, ...customPlans];
+}
+
 async function loadCatalog() {
   const loading = document.getElementById('plans-loading');
   if (loading) loading.style.display = '';
@@ -292,11 +335,14 @@ async function loadCatalog() {
     }
   } catch {
     allTemplates = FALLBACK_TEMPLATES;
-  } finally {
-    if (loading) loading.style.display = 'none';
-    applyFilters();
-    renderHeroSwiper();
   }
+
+  await mergeEnrollments();
+
+  const loadingEl = document.getElementById('plans-loading');
+  if (loadingEl) loadingEl.style.display = 'none';
+  applyFilters();
+  renderHeroSwiper();
 }
 
 async function handleAdopt(template) {
@@ -306,6 +352,11 @@ async function handleAdopt(template) {
     if (window.openAuthModal) {
       window.openAuthModal('login');
     }
+    return;
+  }
+
+  if (template.enrolled) {
+    window.location.href = 'dashboard.html';
     return;
   }
 
