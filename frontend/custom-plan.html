@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Build Your Own Plan — Quiter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/tokens.css" />
+  <link rel="stylesheet" href="assets/css/layout.css" />
+</head>
+<body style="background: var(--bg);">
+
+  <header class="nav wrap" style="position: sticky; top: 0;">
+    <div class="liquid-glass nav__pill">
+      <div class="nav__left">
+        <a href="index.html" class="nav__mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
+          Quiter
+        </a>
+        <nav class="nav__links">
+          <a href="plans.html">Plans</a>
+          <a href="about.html">About</a>
+        </nav>
+      </div>
+      <div class="nav__right" id="nav-auth-slot"></div>
+    </div>
+  </header>
+
+  <main class="wrap custom-plan-page">
+    <a href="dashboard.html" class="custom-plan-page__back">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to dashboard
+    </a>
+
+    <div class="custom-plan-page__intro">
+      <p class="custom-plan__eyebrow">Your pace. Your direction.</p>
+      <h1 class="h2">Build your own plan</h1>
+      <p class="custom-plan__intro">
+        Choose a pace that feels possible. You can always change your approach
+        later — this plan is here to support you, not pressure you.
+      </p>
+    </div>
+
+    <div class="liquid-glass liquid-glass--panel custom-plan-page__panel">
+      <form id="custom-plan-form">
+        <div class="liquid-glass custom-plan__group">
+          <p class="custom-plan__group-label">Your goal</p>
+
+          <div class="modal__field">
+            <label for="custom-goal">What are you quitting or building?</label>
+            <textarea
+              id="custom-goal"
+              maxlength="160"
+              placeholder="e.g. checking my phone first thing every morning"
+              required
+            ></textarea>
+            <div class="custom-plan__counter" id="custom-goal-count">0 / 160</div>
+          </div>
+
+          <div class="modal__field">
+            <label>Direction</label>
+            <div class="modal__radio-row">
+              <label>
+                <input type="radio" name="custom-direction" value="break" checked />
+                <span>Break a habit</span>
+              </label>
+              <label>
+                <input type="radio" name="custom-direction" value="build" />
+                <span>Build a habit</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-glass custom-plan__group">
+          <p class="custom-plan__group-label">Pace</p>
+
+          <div class="modal__field">
+            <div class="custom-plan__range-heading">
+              <label for="custom-length">Plan period</label>
+              <output id="custom-length-output" for="custom-length">30 days</output>
+            </div>
+
+            <input id="custom-length" type="range" min="3" max="365" value="30" step="1" />
+
+            <div class="custom-plan__range-labels">
+              <span>3 days</span>
+              <span>365 days</span>
+            </div>
+
+            <div class="custom-plan__presets" aria-label="Plan length presets">
+              <button type="button" data-plan-preset="7">7</button>
+              <button type="button" data-plan-preset="15">15</button>
+              <button type="button" data-plan-preset="30">30</button>
+              <button type="button" data-plan-preset="60">60</button>
+              <button type="button" data-plan-preset="90">90</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-glass custom-plan__group">
+          <p class="custom-plan__group-label">Identity &amp; support</p>
+
+          <div class="modal__field">
+            <label for="custom-identity">
+              Identity statement
+              <span class="custom-plan__optional">Optional</span>
+            </label>
+            <input
+              id="custom-identity"
+              type="text"
+              maxlength="160"
+              placeholder="e.g. I am someone who protects my attention."
+            />
+          </div>
+
+          <div class="modal__field">
+            <label>How should Quiter support you?</label>
+            <div class="modal__radio-row">
+              <label>
+                <input type="radio" name="custom-support-style" value="gentle" checked />
+                <span>Gentle</span>
+              </label>
+              <label>
+                <input type="radio" name="custom-support-style" value="focused" />
+                <span>Focused</span>
+              </label>
+              <label>
+                <input type="radio" name="custom-support-style" value="reflective" />
+                <span>Reflective</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="liquid-glass custom-plan__group">
+          <p class="custom-plan__group-label">Reminder emails <span class="custom-plan__optional">Optional</span></p>
+          <p class="custom-plan__hint">Choose up to three times. You can also leave reminders off.</p>
+
+          <div class="custom-plan__reminders">
+            <label class="custom-plan__reminder-row" data-reminder-row>
+              <span class="custom-plan__reminder-label">
+                <input type="checkbox" data-reminder-toggle />
+                <span>Morning</span>
+              </span>
+              <input type="time" value="09:00" data-reminder-time disabled />
+            </label>
+
+            <label class="custom-plan__reminder-row" data-reminder-row>
+              <span class="custom-plan__reminder-label">
+                <input type="checkbox" data-reminder-toggle />
+                <span>Afternoon</span>
+              </span>
+              <input type="time" value="14:00" data-reminder-time disabled />
+            </label>
+
+            <label class="custom-plan__reminder-row" data-reminder-row>
+              <span class="custom-plan__reminder-label">
+                <input type="checkbox" data-reminder-toggle />
+                <span>Evening</span>
+              </span>
+              <input type="time" value="20:00" data-reminder-time disabled />
+            </label>
+          </div>
+        </div>
+
+        <p class="modal__error" id="custom-error"></p>
+
+        <button class="btn btn--solid modal__submit" type="submit">Create my plan</button>
+      </form>
+    </div>
+  </main>
+
+  <footer class="footer wrap">
+    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
+    <span>Privacy · Terms · Contact</span>
+  </footer>
+
+  <script src="assets/js/mobile-nav.js"></script>
+  <script type="module" src="assets/js/custom-plan.js"></script>
+</body>
+</html>

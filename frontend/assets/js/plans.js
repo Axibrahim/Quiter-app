@@ -208,6 +208,7 @@ function initSwiperInteractions() {
   let scrollStart = 0;
 
   track.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return; // let button clicks through untouched
     isDown = true;
     track.classList.add('is-dragging');
     startX = e.clientX;
@@ -246,7 +247,7 @@ function initSwiperInteractions() {
 
 function renderCustomPlanCard() {
   const card = document.createElement('a');
-  card.href = 'dashboard.html';
+  card.href = 'custom-plan.html';
   card.className = 'liquid-glass liquid-glass--panel plan-card plan-card--custom';
   card.id = 'custom-plan-card';
   card.innerHTML = `

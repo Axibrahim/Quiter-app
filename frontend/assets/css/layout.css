@@ -2269,3 +2269,43 @@ main,
   color: var(--accent-violet);
   margin-bottom: var(--space-2);
 }
+
+
+/* =========================================================================
+   CUSTOM PLAN — STANDALONE PAGE
+   ========================================================================= */
+
+.custom-plan-page {
+  padding-block: var(--space-4, 2rem) var(--space-6, 4rem);
+  max-width: 720px;
+}
+
+.custom-plan-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-50);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-3);
+}
+
+.custom-plan-page__back:hover {
+  color: var(--ink);
+}
+
+.custom-plan-page__intro {
+  margin-bottom: var(--space-4);
+}
+
+.custom-plan-page__intro .h2 {
+  margin-bottom: 0.5rem;
+}
+
+.custom-plan-page__intro .custom-plan__intro {
+  margin: 0;
+}
+
+.custom-plan-page__panel {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
