@@ -2309,3 +2309,118 @@ main,
   padding: var(--space-4);
   border-radius: var(--radius-lg);
 }
+
+/* =========================================================================
+   PROGRESSION DASHBOARD PAGE
+   ========================================================================= */
+
+.progress-page {
+  padding-block: var(--space-4, 2rem) var(--space-6, 4rem);
+  max-width: 900px;
+}
+
+.progress-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.progress-page__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--accent-violet);
+  margin-bottom: 0.4rem;
+}
+
+.progress-page__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.progress-stat {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+.progress-stat__label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+  margin-bottom: 0.5rem;
+}
+
+.progress-stat__value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.progress-page__warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(255, 107, 74, 0.12);
+  border: 1px solid rgba(255, 107, 74, 0.35);
+  color: var(--ink);
+  font-size: 0.9rem;
+  margin-bottom: var(--space-3);
+}
+
+.progress-page__warning span {
+  color: var(--accent-ember);
+  font-weight: 700;
+}
+
+.progress-page__heatmap-panel {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+.progress-heatmap {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+  margin: var(--space-2) 0;
+}
+
+.progress-heatmap__cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+
+.progress-heatmap__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: var(--space-2);
+}
+
+.progress-heatmap__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--ink-40);
+}
+
+.progress-heatmap__legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+@media (max-width: 640px) {
+  .progress-heatmap {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}

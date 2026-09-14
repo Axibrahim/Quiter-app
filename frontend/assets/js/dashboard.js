@@ -27,6 +27,7 @@ function renderPlanCard(plan) {
         ${plan.already_logged_today ? 'Already checked in today' : 'Mark complete'}
       </button>
       <button class="liquid-glass btn btn--glass" data-checkin="missed" data-plan-id="${plan.user_plan_id}" ${disabled ? 'disabled' : ''} type="button">I slipped today</button>
+      <a class="liquid-glass btn btn--glass" href="progress.html?plan=${plan.user_plan_id}">View progress</a>
     </div>
   `;
   return wrapper;

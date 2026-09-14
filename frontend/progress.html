@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your Progress — Quiter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/tokens.css" />
+  <link rel="stylesheet" href="assets/css/layout.css" />
+</head>
+<body style="background: var(--bg);">
+
+  <header class="nav wrap" style="position: sticky; top: 0;">
+    <div class="liquid-glass nav__pill">
+      <div class="nav__left">
+        <a href="index.html" class="nav__mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
+          Quiter
+        </a>
+        <nav class="nav__links">
+          <a href="dashboard.html">Dashboard</a>
+          <a href="plans.html">Plans</a>
+        </nav>
+      </div>
+      <div class="nav__right" id="nav-auth-slot"></div>
+    </div>
+  </header>
+
+  <main class="wrap progress-page">
+    <a href="dashboard.html" class="custom-plan-page__back">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to dashboard
+    </a>
+
+    <p id="progress-loading" class="lede">Loading your progress…</p>
+    <p id="progress-error" class="modal__error"></p>
+
+    <div id="progress-content" style="display: none;">
+      <div class="progress-page__header">
+        <div>
+          <p class="progress-page__eyebrow" id="progress-eyebrow"></p>
+          <h1 class="h2" id="progress-title"></h1>
+        </div>
+        <button class="btn btn--solid" id="progress-checkin-btn" type="button">Check in today</button>
+      </div>
+
+      <div class="progress-page__stats">
+        <div class="liquid-glass liquid-glass--panel progress-stat">
+          <p class="progress-stat__label">Current streak</p>
+          <p class="progress-stat__value" id="stat-current-streak" style="color: var(--accent-teal);"></p>
+        </div>
+        <div class="liquid-glass liquid-glass--panel progress-stat">
+          <p class="progress-stat__label">Longest streak</p>
+          <p class="progress-stat__value" id="stat-longest-streak" style="color: var(--accent-violet);"></p>
+        </div>
+        <div class="liquid-glass liquid-glass--panel progress-stat">
+          <p class="progress-stat__label">Plan completion</p>
+          <p class="progress-stat__value" id="stat-completion" style="color: #f8bf40;"></p>
+        </div>
+      </div>
+
+      <div class="progress-page__warning" id="progress-warning" style="display: none;">
+        <span>●</span>
+        <p id="progress-warning-text"></p>
+      </div>
+
+      <div class="liquid-glass liquid-glass--panel progress-page__heatmap-panel">
+        <p class="progress-stat__label">Last 30 days</p>
+        <div class="progress-heatmap" id="progress-heatmap"></div>
+        <div class="progress-heatmap__legend">
+          <span><i style="background: var(--accent-teal);"></i>Completed</span>
+          <span><i style="background: #f8bf40;"></i>Partial</span>
+          <span><i style="background: rgba(255,255,255,0.15);"></i>Missed / none</span>
+          <span><i style="background: var(--accent-ember);"></i>Relapsed</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer wrap">
+    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
+    <span>Privacy · Terms · Contact</span>
+  </footer>
+
+  <script src="assets/js/mobile-nav.js"></script>
+  <script type="module" src="assets/js/progress.js"></script>
+</body>
+</html>
