@@ -7,7 +7,7 @@ can never mutate another user's plan by guessing a UUID (IDOR protection —
 the WHERE clause always includes user_id, enforced at the query layer, not
 just "checked after the fact").
 """
-from datetime import date
+from datetime import date, timedelta
 import re
 from zoneinfo import ZoneInfo
 from flask import Blueprint, request, jsonify, g
@@ -302,6 +302,11 @@ def checkin(user_plan_id):
         # which is deliberately reflected here at the data layer.
         user_plan.current_streak = 0
 
+    # Any check-in at all — completed, missed, or relapsed — counts as the
+    # user showing up. That's what resets the 15-day auto-quit clock, not
+    # just a "completed" streak.
+    user_plan.last_checkin_date = today
+
     db.session.commit()
 
     return jsonify({
@@ -311,6 +316,64 @@ def checkin(user_plan_id):
         "is_completed": user_plan.is_completed,
         "reward_tier": plan_day.reward_tier if (plan_day and status_raw == LogStatus.COMPLETED.value) else 0,
     }), 200
+
+
+AUTO_QUIT_DAYS = 15
+
+
+@plans_bp.route("/<user_plan_id>/progress", methods=["GET"])
+@login_required
+def get_progress(user_plan_id):
+    """Everything the progression dashboard needs in one call: streaks,
+    completion, the auto-quit countdown, and a 30-day check-in heatmap."""
+    if not validate_uuid_param(user_plan_id):
+        return jsonify({"error": "invalid_id"}), 400
+
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    today = date.today()
+    day_number = max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
+    completion_pct = round((day_number / user_plan.template.length_days) * 100)
+
+    days_since_checkin = (today - user_plan.last_checkin_date).days
+    days_until_auto_quit = max(0, AUTO_QUIT_DAYS - days_since_checkin)
+
+    window_start = today - timedelta(days=29)
+    logs = DailyLog.query.filter(
+        DailyLog.user_plan_id == user_plan.id,
+        DailyLog.log_date >= window_start,
+        DailyLog.log_date <= today,
+    ).all()
+    log_by_date = {log.log_date.isoformat(): log.status.value for log in logs}
+
+    heatmap = []
+    for i in range(30):
+        d = (window_start + timedelta(days=i)).isoformat()
+        heatmap.append({"date": d, "status": log_by_date.get(d, "none")})
+
+    already_logged_today = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first() is not None
+
+    return jsonify({
+        "user_plan_id": user_plan.id,
+        "title": user_plan.template.title,
+        "direction": user_plan.template.direction.value,
+        "day_number": day_number,
+        "total_days": user_plan.template.length_days,
+        "completion_pct": completion_pct,
+        "current_streak": user_plan.current_streak,
+        "longest_streak": user_plan.longest_streak,
+        "start_date": user_plan.start_date.isoformat(),
+        "last_checkin_date": user_plan.last_checkin_date.isoformat(),
+        "days_since_checkin": days_since_checkin,
+        "days_until_auto_quit": days_until_auto_quit,
+        "already_logged_today": already_logged_today,
+        "is_completed": user_plan.is_completed,
+        "is_abandoned": user_plan.is_abandoned,
+        "heatmap": heatmap,
+    }), 200
+
 
 @plans_bp.route("/custom", methods=["POST"])
 @login_required

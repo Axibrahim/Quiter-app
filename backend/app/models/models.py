@@ -196,6 +196,7 @@ class UserPlan(db.Model):
     start_date = Column(Date, nullable=False, default=date.today)
     current_streak = Column(Integer, nullable=False, default=0)
     longest_streak = Column(Integer, nullable=False, default=0)
+    last_checkin_date = Column(Date, nullable=False, default=date.today)
     is_completed = Column(Boolean, nullable=False, default=False)
     is_abandoned = Column(Boolean, nullable=False, default=False)
 
