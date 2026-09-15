@@ -375,6 +375,27 @@ def get_progress(user_plan_id):
     }), 200
 
 
+@plans_bp.route("/<user_plan_id>/abandon", methods=["POST"])
+@login_required
+def abandon_plan(user_plan_id):
+    """User-initiated exit — distinct from the worker's automatic 15-day
+    abandon, but lands in the same is_abandoned flag either way."""
+    if not validate_uuid_param(user_plan_id):
+        return jsonify({"error": "invalid_id"}), 400
+
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    if user_plan.is_completed:
+        return jsonify({"error": "plan_already_completed"}), 409
+
+    user_plan.is_abandoned = True
+    db.session.commit()
+
+    return jsonify({"ok": True}), 200
+
+
 @plans_bp.route("/custom", methods=["POST"])
 @login_required
 def create_custom_plan():

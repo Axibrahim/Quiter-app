@@ -82,6 +82,10 @@ async function loadProgress(planId) {
         checkinBtn.disabled = false;
       }
     };
+
+    if (!data.is_completed && !data.is_abandoned) {
+      initExitConfirm(planId);
+    }
   } catch (err) {
     loading.style.display = 'none';
     errorEl.textContent = `Couldn't load this plan's progress (${err.message}).`;
@@ -89,6 +93,44 @@ async function loadProgress(planId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+
+function initExitConfirm(planId) {
+  const btn = document.getElementById('progress-exit-btn');
+  if (!btn) return;
+
+  let confirming = false;
+  let resetTimer = null;
+
+  const reset = () => {
+    confirming = false;
+    btn.textContent = 'Exit this plan';
+    btn.classList.remove('is-confirming');
+    clearTimeout(resetTimer);
+  };
+
+  reset();
+
+  btn.onclick = async () => {
+    if (!confirming) {
+      confirming = true;
+      btn.textContent = 'Tap again to confirm exit';
+      btn.classList.add('is-confirming');
+      resetTimer = setTimeout(reset, 4000); // auto-reverts if they don't confirm
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      await api.post(`/plans/${planId}/abandon`);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      alert(`Couldn't exit this plan: ${err.message}`);
+      btn.disabled = false;
+      reset();
+    }
+  };
+}
+
   const user = await requireAuth();
   if (!user) return;
 
