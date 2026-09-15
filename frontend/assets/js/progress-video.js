@@ -109,7 +109,13 @@ function renderGallery(videos) {
   gallery.innerHTML = '';
 
   if (videos.length === 0) {
-    gallery.innerHTML = '<p class="custom-plan__hint">No check-in videos yet — record your first one above.</p>';
+    gallery.innerHTML = `
+      <div class="progress-video__empty">
+        <span class="progress-video__empty-icon"></span>
+        <p class="progress-video__empty-title">No check-ins recorded yet</p>
+        <p class="custom-plan__hint">Record your first 10-second video to start your progression reel.</p>
+      </div>
+    `;
     return;
   }
 
@@ -125,16 +131,21 @@ function renderGallery(videos) {
 }
 
 export async function initProgressVideo(planId, currentFrequency) {
-  const freqSelect = document.getElementById('video-frequency-select');
-  freqSelect.value = currentFrequency || '';
-
-  freqSelect.onchange = async () => {
-    try {
-      await api.patch(`/plans/${planId}/video-frequency`, { frequency: freqSelect.value || null });
-    } catch (err) {
-      alert(`Couldn't save your reminder preference: ${err.message}`);
-    }
-  };
+  const segButtons = document.querySelectorAll('#video-frequency-segmented .progress-video__seg-btn');
+  segButtons.forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.freq === (currentFrequency || ''));
+    btn.onclick = async () => {
+      segButtons.forEach((b) => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      try {
+        await api.patch(`/plans/${planId}/video-frequency`, { frequency: btn.dataset.freq || null });
+      } catch (err) {
+        alert(`Couldn't save your reminder preference: ${err.message}`);
+        btn.classList.remove('is-active');
+        segButtons.forEach((b) => b.classList.toggle('is-active', b.dataset.freq === (currentFrequency || '')));
+      }
+    };
+  });
 
   const refreshGallery = async () => {
     try {

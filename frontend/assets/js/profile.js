@@ -11,14 +11,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const user = await requireAuth();
   if (!user) return;
 
+  // Don't overwrite nav-auth-slot — requireAuth() above already populated it
+  // consistently (Admin pill + username pill) via the shared applyNavState().
+  // Just append a Logout button alongside it.
   const slot = document.getElementById('nav-auth-slot');
   if (slot) {
-    slot.innerHTML = `
-      <a href="dashboard.html" class="btn btn--text">Dashboard</a>
-      <button class="btn btn--text" id="logout-btn" type="button">Logout</button>
-    `;
-    document.getElementById('logout-btn')?.addEventListener('click', logout);
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'liquid-glass btn btn--glass';
+    logoutBtn.type = 'button';
+    logoutBtn.textContent = 'Logout';
+    logoutBtn.addEventListener('click', logout);
+    slot.appendChild(logoutBtn);
   }
+
 
   document.getElementById('profile-display-name').value = user.display_name;
   document.getElementById('profile-email').value = user.email;

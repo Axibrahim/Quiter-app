@@ -31,7 +31,8 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-baseUrl: BASE_URL,  get: (path) => request(path, { method: 'GET' }),
+  baseUrl: API_BASE,
+  get: (path) => request(path, { method: 'GET' }),
   post: (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) }),
   patch: (path, data) => request(path, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (path) => request(path, { method: 'DELETE' }),

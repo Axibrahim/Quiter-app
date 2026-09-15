@@ -12,7 +12,7 @@ import re
 from zoneinfo import ZoneInfo
 from flask import Blueprint, request, jsonify, g
 
-from app.models.models import db, PlanTemplate, PlanDay, UserPlan, DailyLog, LogStatus, gen_uuid
+from app.models.models import db, PlanTemplate, PlanDay, UserPlan, DailyLog, LogStatus, ProgressVideo, gen_uuid
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
 from app.security.limiter import limiter, HABIT_LOG_RATE_LIMIT

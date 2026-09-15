@@ -177,7 +177,8 @@ main,
    ========================================================================= */
 
 .nav {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 20;
   padding: var(--space-3, 1rem) clamp(1.25rem, 4vw, 3rem);
 }
@@ -2000,7 +2001,8 @@ main,
 }
 
 .plans-hero-swiper .nav {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 20;
   padding: var(--space-3, 1rem) clamp(1.25rem, 4vw, 3rem);
 }
@@ -2462,13 +2464,14 @@ main,
   font-weight: 600;
 }
 
+
 /* =========================================================================
    PROGRESS VIDEO CHECK-INS
    ========================================================================= */
 
 .progress-page__video-panel {
-  padding: var(--space-3);
-  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  border-radius: 22px;
   margin-bottom: var(--space-3);
 }
 
@@ -2476,16 +2479,51 @@ main,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.progress-video__frequency {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+.progress-video__segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
   border-radius: var(--radius-full);
-  color: var(--ink);
-  padding: 0.4rem 0.9rem;
-  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-video__seg-btn {
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-60);
+  transition: background 200ms cubic-bezier(.22, 1, .36, 1), color 200ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.progress-video__seg-btn.is-active {
+  background: var(--accent-violet);
+  color: #0b0a10;
+}
+
+.progress-video__record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.progress-video__rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-ember);
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
 }
 
 #video-preview, #video-review {
@@ -2529,4 +2567,30 @@ main,
   color: var(--ink-40);
   margin-top: 0.3rem;
   text-align: center;
+}
+
+.progress-video__empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: var(--space-4) var(--space-3);
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.progress-video__empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(141, 124, 255, 0.15);
+  margin-bottom: 0.3rem;
+}
+
+.progress-video__empty-title {
+  font-weight: 600;
+  color: var(--ink);
 }

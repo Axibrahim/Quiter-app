@@ -32,16 +32,8 @@ function applyNavState() {
   if (!slot) return;
 
   if (currentUser) {
-    // Dynamically insert Dashboard into the main navigation links if not already present
-    if (navLinks && !document.getElementById('nav-dashboard-link')) {
-      const dashLink = document.createElement('a');
-      dashLink.id = 'nav-dashboard-link';
-      dashLink.href = 'dashboard.html';
-      dashLink.textContent = 'Dashboard';
-      navLinks.appendChild(dashLink);
-    }
-
     // Keep only the User Profile pill (plus Admin, if applicable) in the right slot
+
     slot.innerHTML = `
       ${currentUser.is_admin ? '<a href="admin.html" class="liquid-glass btn btn--glass">Admin</a>' : ''}
       <a href="profile.html" class="liquid-glass btn btn--glass user-pill">${escapeHtml(currentUser.display_name)}</a>
