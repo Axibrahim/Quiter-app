@@ -284,7 +284,7 @@ def checkin(user_plan_id):
     log = DailyLog(
         user_id=g.current_user.id,
         user_plan_id=user_plan.id,
-        plan_day_id=plan_day.id,
+        plan_day_id=plan_day.id if plan_day else None,
         log_date=today,
         status=status_raw,
         note=(payload.get("note") or "")[:280] or None,

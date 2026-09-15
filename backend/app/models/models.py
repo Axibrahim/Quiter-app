@@ -223,7 +223,7 @@ class DailyLog(db.Model):
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False)
-    plan_day_id = Column(UUID(as_uuid=False), ForeignKey("plan_days.id", ondelete="RESTRICT"), nullable=False)
+    plan_day_id = Column(UUID(as_uuid=False), ForeignKey("plan_days.id", ondelete="RESTRICT"), nullable=True)
 
     log_date = Column(Date, nullable=False, default=date.today)
     status = Column(Enum(LogStatus, name="log_status"), nullable=False)
