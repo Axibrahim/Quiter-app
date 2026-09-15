@@ -31,7 +31,84 @@ def _active_plan_count(user_id):
 
 
 def _read_custom_settings(payload):
-    EXERCISE_LIBRARY = [
+    """
+    Validate flexible custom-plan settings.
+
+    Returns:
+        ((length_days, identity_statement, support_style,
+          reminder_times, reminder_timezone), None)
+        or
+        (None, error_code)
+    """
+    length_days = payload.get("length_days")
+
+    if (
+        not isinstance(length_days, int)
+        or isinstance(length_days, bool)
+        or not 3 <= length_days <= 365
+    ):
+        return None, "invalid_length_days"
+
+    identity_statement = payload.get("identity_statement") or ""
+    if not isinstance(identity_statement, str):
+        return None, "invalid_identity_statement"
+
+    identity_statement = identity_statement.strip()
+    if len(identity_statement) > 160:
+        return None, "invalid_identity_statement"
+
+    support_style = payload.get("support_style") or "gentle"
+    if support_style not in SUPPORT_STYLES:
+        return None, "invalid_support_style"
+
+    raw_times = payload.get("reminder_times", [])
+    if raw_times is None:
+        raw_times = []
+
+    if not isinstance(raw_times, list) or len(raw_times) > 3:
+        return None, "invalid_reminder_times"
+
+    normalized_times = []
+    for reminder_time in raw_times:
+        if (
+            not isinstance(reminder_time, str)
+            or not REMINDER_TIME_RE.fullmatch(reminder_time)
+        ):
+            return None, "invalid_reminder_times"
+
+        if reminder_time not in normalized_times:
+            normalized_times.append(reminder_time)
+
+    normalized_times.sort(
+        key=lambda value: int(value[:2]) * 60 + int(value[3:])
+    )
+
+    reminder_timezone = payload.get("reminder_timezone") or "UTC"
+
+    if (
+        not isinstance(reminder_timezone, str)
+        or len(reminder_timezone) > 64
+    ):
+        return None, "invalid_timezone"
+
+    try:
+        ZoneInfo(reminder_timezone)
+    except Exception:
+        return None, "invalid_timezone"
+
+    return (
+        (
+            length_days,
+            identity_statement,
+            support_style,
+            normalized_times,
+            reminder_timezone,
+        ),
+        None,
+    )
+
+
+EXERCISE_LIBRARY = [
     "swimming", "boxing", "general workout", "calisthenics", "weight lifting",
     "running", "cycling", "yoga", "hiit", "martial arts", "climbing",
     "pilates", "crossfit", "rowing", "tennis", "basketball", "soccer", "dance",
