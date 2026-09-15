@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from flask import Blueprint, request, jsonify, g
 
 from app.models.models import db, PlanTemplate, PlanDay, UserPlan, DailyLog, LogStatus, gen_uuid
+from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
 from app.security.limiter import limiter, HABIT_LOG_RATE_LIMIT
 from app.utils.validation import validate_uuid_param
@@ -480,6 +481,7 @@ def get_progress(user_plan_id):
         "days_since_checkin": days_since_checkin,
         "days_until_auto_quit": days_until_auto_quit,
         "already_logged_today": already_logged_today,
+        "video_checkin_frequency": user_plan.video_checkin_frequency,
         "is_completed": user_plan.is_completed,
         "is_abandoned": user_plan.is_abandoned,
         "heatmap": heatmap,
@@ -721,3 +723,85 @@ def create_athletic_plan():
 @plans_bp.route("/exercise-library", methods=["GET"])
 def get_exercise_library():
     return jsonify(EXERCISE_LIBRARY), 200
+
+VIDEO_FREQUENCIES = {"weekly", "monthly", None}
+
+
+@plans_bp.route("/<user_plan_id>/videos", methods=["POST"])
+@login_required
+def upload_progress_video_route(user_plan_id):
+    if not validate_uuid_param(user_plan_id):
+        return jsonify({"error": "invalid_id"}), 400
+
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    file = request.files.get("video")
+    if file is None:
+        return jsonify({"error": "no_file"}), 400
+
+    try:
+        video_url = upload_progress_video(file.read(), file.mimetype)
+    except SupabaseStorageError as e:
+        return jsonify({"error": str(e)}), 400
+
+    today = date.today()
+    day_number = max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
+
+    video = ProgressVideo(
+        user_id=g.current_user.id,
+        user_plan_id=user_plan.id,
+        video_url=video_url,
+        day_number=day_number,
+    )
+    db.session.add(video)
+    db.session.commit()
+
+    return jsonify({
+        "id": video.id,
+        "video_url": video.video_url,
+        "day_number": video.day_number,
+        "created_at": video.created_at.isoformat(),
+    }), 201
+
+
+@plans_bp.route("/<user_plan_id>/videos", methods=["GET"])
+@login_required
+def list_progress_videos(user_plan_id):
+    if not validate_uuid_param(user_plan_id):
+        return jsonify({"error": "invalid_id"}), 400
+
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    videos = ProgressVideo.query.filter_by(user_plan_id=user_plan.id).order_by(ProgressVideo.created_at.desc()).all()
+
+    return jsonify([{
+        "id": v.id,
+        "video_url": v.video_url,
+        "day_number": v.day_number,
+        "created_at": v.created_at.isoformat(),
+    } for v in videos]), 200
+
+
+@plans_bp.route("/<user_plan_id>/video-frequency", methods=["PATCH"])
+@login_required
+def set_video_frequency(user_plan_id):
+    if not validate_uuid_param(user_plan_id):
+        return jsonify({"error": "invalid_id"}), 400
+
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    frequency = payload.get("frequency")
+    if frequency not in VIDEO_FREQUENCIES:
+        return jsonify({"error": "invalid_frequency"}), 400
+
+    user_plan.video_checkin_frequency = frequency
+    db.session.commit()
+
+    return jsonify({"video_checkin_frequency": frequency}), 200

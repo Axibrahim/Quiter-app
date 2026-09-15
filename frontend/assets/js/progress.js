@@ -1,5 +1,6 @@
 import { requireAuth } from './modules/auth-state.js';
 import { api } from './modules/api-client.js';
+import { initProgressVideo } from './progress-video.js';
 
 const STATUS_COLOR = {
   completed: 'var(--accent-teal)',
@@ -86,6 +87,8 @@ async function loadProgress(planId) {
     if (!data.is_completed && !data.is_abandoned) {
       initExitConfirm(planId);
     }
+
+    await initProgressVideo(planId, data.video_checkin_frequency);
   } catch (err) {
     loading.style.display = 'none';
     errorEl.textContent = `Couldn't load this plan's progress (${err.message}).`;

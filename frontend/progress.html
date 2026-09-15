@@ -68,6 +68,38 @@
         <p id="progress-warning-text"></p>
       </div>
 
+            <div class="liquid-glass liquid-glass--panel progress-page__video-panel">
+        <div class="progress-video__header">
+          <p class="progress-stat__label">Progress videos</p>
+          <select id="video-frequency-select" class="progress-video__frequency">
+            <option value="">Reminders off</option>
+            <option value="weekly">Remind me weekly</option>
+            <option value="monthly">Remind me monthly</option>
+          </select>
+        </div>
+
+        <div id="video-recorder-idle">
+          <button class="btn btn--solid" id="start-recording-btn" type="button">Record a 10-second check-in</button>
+        </div>
+
+        <div id="video-recorder-active" style="display: none;">
+          <video id="video-preview" autoplay muted playsinline></video>
+          <div class="progress-video__countdown" id="recording-countdown"></div>
+        </div>
+
+        <div id="video-recorder-review" style="display: none;">
+          <video id="video-review" controls playsinline></video>
+          <div class="progress-video__review-actions">
+            <button class="btn btn--solid" id="save-recording-btn" type="button">Save this check-in</button>
+            <button class="liquid-glass btn btn--glass" id="discard-recording-btn" type="button">Discard &amp; retry</button>
+          </div>
+        </div>
+
+        <p class="modal__error" id="video-error"></p>
+
+        <div class="progress-video__gallery" id="video-gallery"></div>
+      </div>
+
       <div class="liquid-glass liquid-glass--panel progress-page__heatmap-panel">
         <p class="progress-stat__label">Last 30 days</p>
         <div class="progress-heatmap" id="progress-heatmap"></div>

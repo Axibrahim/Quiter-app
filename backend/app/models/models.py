@@ -198,6 +198,7 @@ class UserPlan(db.Model):
     longest_streak = Column(Integer, nullable=False, default=0)
     last_checkin_date = Column(Date, nullable=False, default=date.today)
     athletic_metadata = Column(JSONB, nullable=True)
+    video_checkin_frequency = Column(String(10), nullable=True)  # 'weekly' | 'monthly' | None
     is_completed = Column(Boolean, nullable=False, default=False)
     is_abandoned = Column(Boolean, nullable=False, default=False)
 
@@ -242,3 +243,16 @@ class DailyLog(db.Model):
         Index("ix_daily_logs_user_date", "user_id", "log_date"),
     )
 
+
+class ProgressVideo(db.Model):
+    """A user's own 10-second check-in recording — purely for their own
+    motivation (watching day-1-you vs day-30-you), never shown to anyone
+    else."""
+    __tablename__ = "progress_videos"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_url = Column(String(500), nullable=False)
+    day_number = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())

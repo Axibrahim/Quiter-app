@@ -2461,3 +2461,72 @@ main,
   border-color: var(--accent-violet);
   font-weight: 600;
 }
+
+/* =========================================================================
+   PROGRESS VIDEO CHECK-INS
+   ========================================================================= */
+
+.progress-page__video-panel {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+}
+
+.progress-video__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.progress-video__frequency {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  color: var(--ink);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+#video-preview, #video-review {
+  width: 100%;
+  max-width: 360px;
+  border-radius: var(--radius-lg);
+  background: #000;
+  display: block;
+  margin: 0 auto;
+}
+
+.progress-video__countdown {
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--accent-ember);
+  margin-top: 0.5rem;
+}
+
+.progress-video__review-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+.progress-video__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: var(--space-3);
+}
+
+.progress-video__gallery-item video {
+  width: 100%;
+  border-radius: var(--radius-md, 12px);
+  background: #000;
+}
+
+.progress-video__gallery-item p {
+  font-size: 0.75rem;
+  color: var(--ink-40);
+  margin-top: 0.3rem;
+  text-align: center;
+}
