@@ -2424,3 +2424,40 @@ main,
     grid-template-columns: repeat(6, 1fr);
   }
 }
+
+/* =========================================================================
+   EXIT PLAN — DOUBLE-CONFIRM BUTTON
+   ========================================================================= */
+
+#progress-exit-btn.is-confirming {
+  background: rgba(255, 107, 74, 0.18);
+  border-color: rgba(255, 107, 74, 0.5);
+  color: var(--accent-ember);
+}
+
+
+/* =========================================================================
+   EXERCISE LIBRARY — CHIP GRID
+   ========================================================================= */
+
+.exercise-library {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: var(--space-2);
+}
+
+.exercise-chip {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  color: var(--ink-60);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.exercise-chip.is-active {
+  background: var(--accent-violet);
+  color: #0b0a10;
+  border-color: var(--accent-violet);
+  font-weight: 600;
+}

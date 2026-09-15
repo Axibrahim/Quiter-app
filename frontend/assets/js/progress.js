@@ -92,7 +92,6 @@ async function loadProgress(planId) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
 
 function initExitConfirm(planId) {
   const btn = document.getElementById('progress-exit-btn');
@@ -131,6 +130,7 @@ function initExitConfirm(planId) {
   };
 }
 
+document.addEventListener('DOMContentLoaded', async () => {
   const user = await requireAuth();
   if (!user) return;
 

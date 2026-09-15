@@ -197,6 +197,7 @@ class UserPlan(db.Model):
     current_streak = Column(Integer, nullable=False, default=0)
     longest_streak = Column(Integer, nullable=False, default=0)
     last_checkin_date = Column(Date, nullable=False, default=date.today)
+    athletic_metadata = Column(JSONB, nullable=True)
     is_completed = Column(Boolean, nullable=False, default=False)
     is_abandoned = Column(Boolean, nullable=False, default=False)
 

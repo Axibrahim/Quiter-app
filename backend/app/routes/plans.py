@@ -31,6 +31,40 @@ def _active_plan_count(user_id):
 
 
 def _read_custom_settings(payload):
+    EXERCISE_LIBRARY = [
+    "swimming", "boxing", "general workout", "calisthenics", "weight lifting",
+    "running", "cycling", "yoga", "hiit", "martial arts", "climbing",
+    "pilates", "crossfit", "rowing", "tennis", "basketball", "soccer", "dance",
+]
+
+
+def _read_athletic_payload(payload):
+    exercise_type = payload.get("exercise_type")
+    if exercise_type not in EXERCISE_LIBRARY:
+        return None, "invalid_exercise_type"
+
+    progression_goal = (payload.get("progression_goal") or "").strip()
+    if not 3 <= len(progression_goal) <= 200:
+        return None, "invalid_progression_goal"
+
+    custom_exercises = payload.get("custom_exercises") or []
+    if not isinstance(custom_exercises, list) or len(custom_exercises) > 4:
+        return None, "invalid_custom_exercises"
+    cleaned_exercises = []
+    for item in custom_exercises:
+        if not isinstance(item, str):
+            return None, "invalid_custom_exercises"
+        item = item.strip()
+        if item:
+            if len(item) > 60:
+                return None, "invalid_custom_exercises"
+            cleaned_exercises.append(item)
+
+    return {
+        "exercise_type": exercise_type,
+        "progression_goal": progression_goal,
+        "custom_exercises": cleaned_exercises,
+    }, None
     """
     Validate flexible custom-plan settings.
 
@@ -516,3 +550,97 @@ def create_custom_plan():
             "start_date": user_plan.start_date.isoformat(),
         }
     ), 201
+
+
+@plans_bp.route("/custom-athletic", methods=["POST"])
+@login_required
+def create_athletic_plan():
+    """Same shape as create_custom_plan, but always 'build' direction and
+    carries exercise-specific metadata (type, goal, up to 4 custom moves)
+    in athletic_metadata rather than bloating UserPlan with niche columns."""
+    payload = request.get_json(silent=True) or {}
+
+    athletic_fields, error = _read_athletic_payload(payload)
+    if error:
+        return jsonify({"error": error}), 400
+
+    settings, error = _read_custom_settings(payload)
+    if error:
+        return jsonify({"error": error}), 400
+
+    if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
+        return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
+
+    (
+        length_days,
+        identity_statement,
+        support_style,
+        reminder_times,
+        reminder_timezone,
+    ) = settings
+
+    exercise_label = athletic_fields["exercise_type"]
+    goal_text = f"{exercise_label} — {athletic_fields['progression_goal']}"[:160]
+
+    if not identity_statement:
+        identity_statement = f"I am someone who trains in {exercise_label} — {athletic_fields['progression_goal']}."
+
+    if support_style == "gentle":
+        daily_action = f"Take one small, kind step toward — {athletic_fields['progression_goal']}."
+    elif support_style == "focused":
+        daily_action = f"Complete one clear training action toward — {athletic_fields['progression_goal']}."
+    else:
+        daily_action = f"Pause, notice how your body feels, and train toward — {athletic_fields['progression_goal']}."
+
+    template = PlanTemplate(
+        slug=f"athletic-{gen_uuid()[:8]}",
+        title=goal_text,
+        identity_statement=identity_statement,
+        direction="build",
+        category=exercise_label,
+        length_days=length_days,
+        description="A flexible athletic training plan built by the user.",
+        is_active=False,
+    )
+    db.session.add(template)
+    db.session.flush()
+
+    for day_number in range(1, length_days + 1):
+        db.session.add(
+            PlanDay(
+                template_id=template.id,
+                day_number=day_number,
+                micro_goal=f"Day {day_number}: {daily_action}",
+                identity_cue=identity_statement,
+                reward_tier=1,
+            )
+        )
+
+    user_plan = UserPlan(
+        user_id=g.current_user.id,
+        template_id=template.id,
+        goal_text=goal_text,
+        identity_statement=identity_statement,
+        support_style=support_style,
+        reminder_times=reminder_times,
+        reminder_timezone=reminder_timezone,
+        reminders_enabled=bool(reminder_times),
+        start_date=date.today(),
+        athletic_metadata=athletic_fields,
+    )
+    db.session.add(user_plan)
+    db.session.commit()
+
+    return jsonify({
+        "user_plan_id": user_plan.id,
+        "template_id": template.id,
+        "title": template.title,
+        "athletic_metadata": athletic_fields,
+        "length_days": length_days,
+        "start_date": user_plan.start_date.isoformat(),
+    }), 201
+
+
+@plans_bp.route("/exercise-library", methods=["GET"])
+def get_exercise_library():
+    return jsonify(EXERCISE_LIBRARY), 200
