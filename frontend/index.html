@@ -20,8 +20,17 @@
 
   <!-- ============================= HERO ============================= -->
   <section class="hero">
-  <canvas id="night-flower-canvas" class="hero__video" aria-hidden="true"></canvas>
-
+  <div class="hero__flower-stage" id="hero-flower-stage" aria-hidden="true">
+    <div class="hero__flower-layer" data-flower-layer="side">
+      <img src="assets/media/flower/side-view.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+    </div>
+    <div class="hero__flower-layer" data-flower-layer="top">
+      <img src="assets/media/flower/top-down.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+    </div>
+    <div class="hero__flower-layer" data-flower-layer="close">
+      <img src="assets/media/flower/close-up.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+    </div>
+  </div>
     <header class="nav">
       <div class="liquid-glass nav__pill">
         <div class="nav__left">
@@ -279,7 +288,6 @@
 
   <script src="assets/js/mobile-nav.js"></script>
   <script type="module" src="assets/js/main.js"></script>
-  <script type="module" src="assets/js/three/night-flower-boot.js"></script>
-
+  <script type="module" src="assets/js/hero-flower.js"></script>
 </body>
 </html>
