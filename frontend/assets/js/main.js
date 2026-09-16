@@ -20,34 +20,6 @@ import { api } from './modules/api-client.js';
 import { initAuthState } from './modules/auth-state.js';
 
 
-/* =========================================================================
-   1. HERO VIDEO
-   ========================================================================= */
-
-function initHeroVideo() {
-  const video = document.getElementById('hero-video');
-  if (!video) return;
-
-  video.loop = true;
-  video.style.opacity = '1';
-
-  const playVideo = () => {
-    video.play().catch(() => {});
-  };
-
-  playVideo();
-  video.addEventListener('canplay', playVideo, { once: true });
-
-  const resumeOnGesture = () => playVideo();
-  window.addEventListener('pointerdown', resumeOnGesture, { once: true });
-  window.addEventListener('touchstart', resumeOnGesture, { once: true });
-
-  video.addEventListener('ended', () => {
-    video.currentTime = 0;
-    playVideo();
-  });
-}
-
 
 /* =========================================================================
    2. HERO VIDEO SCROLL BLUR
@@ -571,18 +543,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('[auth state init failed]', e);
   }
 
-  /* Hero video */
-  try {
-    initHeroVideo();
-  } catch (e) {
-    console.error('[hero video init failed]', e);
-  }
-
-  try {
-    initHeroVideoScrollEffect();
-  } catch (e) {
-    console.error('[hero video scroll effect failed]', e);
-  }
 
   /* Smooth scrolling */
   try {
