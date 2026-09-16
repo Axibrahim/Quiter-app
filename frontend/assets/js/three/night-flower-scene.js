@@ -20,7 +20,7 @@
 import * as THREE from 'https://unpkg.com/three@0.128.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
 
-const MODEL_PATH = 'assets/media/models/glass-flower.glb';
+const MODEL_PATH = 'assets/media/glass-flower.glb';
 
 export class NightFlowerScene {
   constructor(canvas) {
@@ -48,7 +48,7 @@ export class NightFlowerScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 2));
     this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.4;
     this.renderer.shadowMap.enabled = !this.isMobile;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -76,7 +76,7 @@ export class NightFlowerScene {
     const moonMat = new THREE.MeshStandardMaterial({
       color: 0xdedbe6,
       emissive: 0x9d9aad,
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.7,
       roughness: 0.9,
       metalness: 0,
     });
@@ -156,7 +156,7 @@ export class NightFlowerScene {
   // ---- Lighting — one key, one dim rim, minimal ambient -------------
 
   _buildLights() {
-    const key = new THREE.DirectionalLight(0xfff2df, 1.15);
+    const key = new THREE.DirectionalLight(0xfff2df, 3.2);
     key.position.set(5, 9, 6);
     key.castShadow = !this.isMobile;
     if (key.castShadow) {
@@ -167,11 +167,18 @@ export class NightFlowerScene {
     }
     this.scene.add(key);
 
-    const rim = new THREE.DirectionalLight(0xaeb8ff, 0.3);
+    // A second, softer key from the opposite side so the flower doesn't
+    // vanish into black on its unlit side — still dimmer than the main
+    // key so it reads as fill, not a second sun.
+    const fill = new THREE.DirectionalLight(0xd8e0ff, 1.1);
+    fill.position.set(-5, 4, 4);
+    this.scene.add(fill);
+
+    const rim = new THREE.DirectionalLight(0xaeb8ff, 0.9);
     rim.position.set(-6, 6, -12); // roughly from the moon's direction
     this.scene.add(rim);
 
-    const ambient = new THREE.HemisphereLight(0x1a1f33, 0x030304, 0.18);
+    const ambient = new THREE.HemisphereLight(0x2a3050, 0x0a0a10, 0.55);
     this.scene.add(ambient);
 
     this.keyLight = key;
@@ -246,14 +253,13 @@ export class NightFlowerScene {
 
           node.castShadow = node.receiveShadow = !this.isMobile;
 
-          // Keep the model's own baked texture (real surface detail) but
-          // push metalness/roughness toward the chrome look from the brief.
-          if (node.material) {
-            node.material.metalness = 1;
-            node.material.roughness = 0.22;
-            node.material.envMapIntensity = 1.4;
-            node.material.needsUpdate = true;
-          }
+          // TEMPORARY DIAGNOSTIC — bypasses lighting/normals entirely to
+          // isolate whether the problem is materials or geometry/scale.
+          node.material = new THREE.MeshBasicMaterial({
+            color: 0xff8222,
+            side: THREE.DoubleSide,
+            wireframe: false,
+          });
         });
 
         // Auto-center and auto-scale based on the model's REAL bounding
