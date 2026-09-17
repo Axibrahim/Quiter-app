@@ -71,8 +71,8 @@ function initSmoothScroll() {
   gsap.ticker.add((time) => { lenis.raf(time * 1000); });
   gsap.ticker.lagSmoothing(0);
 
-  return lenis;
-}
+  window.__lenisInstance = lenis;
+  return lenis;}
 
 
 /* =========================================================================

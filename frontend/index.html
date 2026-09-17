@@ -19,7 +19,11 @@
   <canvas id="bloom-canvas" aria-hidden="true"></canvas>
 
   <!-- ============================= HERO ============================= -->
-  <section class="hero">
+<section class="hero frame-section">
+  <section class="hero frame-section"></section>
+  <section class="section section--glow wrap about" id="about"></section>
+  <section class="section wrap" id="philosophy"></section>
+  <section class="section wrap frame-section" id="philosophy"></section>
   <div class="hero__flower-stage" id="hero-flower-stage" aria-hidden="true">
     <div class="hero__flower-layer" data-flower-layer="side">
       <img src="assets/media/flower/side-view.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
@@ -73,7 +77,7 @@
   <main>
 
     <!-- ============================= ABOUT ============================= -->
-    <section class="section section--glow wrap about" id="about">
+    <section class="section section--glow wrap about frame-section" id="about"></section>
       <p class="eyebrow" data-reveal>What is Quiter</p>
       <h2 class="h2" data-reveal style="max-width: 18ch; margin-bottom: var(--space-3);">
         A structured way to become <em class="serif-italic">someone new</em> — not just quit something old.
@@ -86,7 +90,7 @@
       </p>
     </section>
 
-    <section class="section wrap" id="philosophy">
+<section class="section wrap frame-section" id="philosophy">
       <h2 class="h2 philosophy__heading" data-reveal>Break <em class="serif-italic">x</em> Build</h2>
       <div class="philosophy-grid">
         <div class="liquid-glass liquid-glass--panel philosophy__visual" data-reveal aria-hidden="true">🌸</div>
@@ -103,7 +107,7 @@
       </div>
     </section>
 
-    <section class="section wrap">
+    <section class="section wrap frame-section">  
       <p class="eyebrow" data-reveal>Why identity, not willpower</p>
       <h2 class="h2" data-reveal style="max-width: 18ch;">Willpower runs out. Identity doesn't.</h2>
       <p class="lede" data-reveal style="max-width: 60ch; margin-top: var(--space-2);">
@@ -115,7 +119,7 @@
       </p>
     </section>
 
-    <section class="section wrap">
+    <section class="section wrap frame-section">
       <p class="eyebrow" data-reveal>Discipline over motivation</p>
       <h2 class="h2" data-reveal style="max-width: 20ch;">Discipline is just a system that doesn't ask how you feel</h2>
       <p class="lede" data-reveal style="max-width: 60ch; margin-top: var(--space-2);">
@@ -128,8 +132,8 @@
     </section>
 
     <!-- ============================= HOW IT WORKS ============================= -->
-    <section class="section wrap" id="how-it-works">
-      <p class="eyebrow" data-reveal>How it works</p>
+    <section class="section wrap frame-section" id="how-it-works"></section>
+    <p class="eyebrow" data-reveal>How it works</p>
       <h2 class="h2" data-reveal>Three small things, every day</h2>
       <div class="steps-grid">
         <div class="liquid-glass liquid-glass--panel step-card" data-reveal>
@@ -151,8 +155,8 @@
     </section>
 
     <!-- ============================= SERVICES ============================= -->
-    <section class="section wrap" id="services">
-      <div class="services__head">
+  <section class="section wrap frame-section" id="services"></section>
+    <div class="services__head">
         <h2 class="h2" data-reveal>What Quiter gives you</h2>
         <p class="eyebrow" data-reveal>Two ways to change</p>
       </div>
@@ -183,8 +187,8 @@
     </section>
 
     <!-- ============================= PLANS (functional) ============================= -->
-    <section class="section wrap" id="plans">
-      <div class="section__head">
+    <section class="section wrap frame-section" id="plans">
+        <div class="section__head">
         <div>
           <p class="eyebrow" data-reveal>Choose your identity</p>
           <h2 class="h2" data-reveal>Every plan maps to who you're becoming</h2>
@@ -288,6 +292,8 @@
 
   <script src="assets/js/mobile-nav.js"></script>
   <script type="module" src="assets/js/main.js"></script>
-  <script type="module" src="assets/js/hero-flower.js"></script>
+  <script type="module" src="assets/js/three/hero-flower.js"></script>
+  <script type="module" src="assets/js/frame-snap.js"></script>
+</body>
 </body>
 </html>
