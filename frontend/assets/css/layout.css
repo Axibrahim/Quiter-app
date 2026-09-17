@@ -2621,7 +2621,8 @@ main,
   animation: flower-breathe 8s ease-in-out infinite;
 }
 
-.hero__flower-layer img {
+.hero__flower-layer img,
+.hero__flower-layer video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2655,4 +2656,93 @@ main,
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+/* =========================================================================
+   FULL-SCREEN SITE MENU — liquid-glass Three.js background
+   ========================================================================= */
+
+.site-menu-toggle {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-left: 0.5rem;
+}
+
+.site-menu-toggle__bar {
+  width: 18px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: transform 280ms cubic-bezier(.22, 1, .36, 1), opacity 200ms ease;
+}
+
+.site-menu-toggle.is-open .site-menu-toggle__bar:first-child {
+  transform: translateY(3.5px) rotate(45deg);
+}
+.site-menu-toggle.is-open .site-menu-toggle__bar:last-child {
+  transform: translateY(-3.5px) rotate(-45deg);
+}
+
+.site-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 400ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 400ms;
+}
+
+.site-menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 400ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 0s;
+}
+
+#site-menu-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.site-menu__links {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.site-menu__link {
+  font-size: clamp(2.2rem, 8vw, 4.5rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--ink);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  transition: color 220ms ease;
+}
+
+.site-menu__link:hover {
+  color: var(--accent-violet);
+}
+
+.site-menu__footer {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--space-4);
+  font-size: 0.8rem;
+  color: var(--ink-40);
 }

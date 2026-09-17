@@ -5,7 +5,7 @@
  * real-time Three.js render — same visual intent, far more reliable.
  */
 
-const LAYER_NAMES = ['side', 'top', 'close'];
+const LAYER_NAMES = ['video', 'side', 'top', 'close'];
 
 function initFlowerScroll() {
   const stage = document.getElementById('hero-flower-stage');

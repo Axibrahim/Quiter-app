@@ -25,6 +25,9 @@
   <section class="section wrap" id="philosophy"></section>
   <section class="section wrap frame-section" id="philosophy"></section>
   <div class="hero__flower-stage" id="hero-flower-stage" aria-hidden="true">
+    <div class="hero__flower-layer" data-flower-layer="video">
+      <video src="assets/media/glass-flower.mp4" muted autoplay loop playsinline preload="auto"></video>
+    </div>
     <div class="hero__flower-layer" data-flower-layer="side">
       <img src="assets/media/flower/side-view.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
     </div>
@@ -51,8 +54,24 @@
           <button class="btn btn--text" id="signup-trigger" type="button">Sign Up</button>
           <button class="liquid-glass btn btn--glass" id="login-trigger" type="button">Login</button>
         </div>
+        <button class="liquid-glass site-menu-toggle" id="site-menu-toggle" type="button" aria-label="Open menu" aria-expanded="false">
+          <span class="site-menu-toggle__bar"></span>
+          <span class="site-menu-toggle__bar"></span>
+        </button>
       </div>
     </header>
+        <div class="site-menu" id="site-menu" aria-hidden="true">
+      <canvas id="site-menu-canvas" aria-hidden="true"></canvas>
+      <nav class="site-menu__links">
+        <a href="#top" class="site-menu__link" data-menu-link>Home</a>
+        <a href="plans.html" class="site-menu__link" data-menu-link>Plans</a>
+        <a href="#about" class="site-menu__link" data-menu-link>About</a>
+        <a href="dashboard.html" class="site-menu__link" data-menu-link>Dashboard</a>
+      </nav>
+      <div class="site-menu__footer">
+        <span>© 2026 Quiter — Built to be quit</span>
+      </div>
+    </div>
 
     <div class="hero__content" id="top">
       <h1 class="hero__title" id="hero-title" aria-label="Stop performing willpower. Start becoming.">
@@ -294,6 +313,6 @@
   <script type="module" src="assets/js/main.js"></script>
   <script type="module" src="assets/js/three/hero-flower.js"></script>
   <script type="module" src="assets/js/frame-snap.js"></script>
-</body>
+  <script type="module" src="assets/js/three/site-menu.js"></script></body>
 </body>
 </html>
