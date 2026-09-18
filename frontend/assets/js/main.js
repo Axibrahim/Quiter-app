@@ -20,39 +20,6 @@ import { api } from './modules/api-client.js';
 import { initAuthState } from './modules/auth-state.js';
 
 
-
-/* =========================================================================
-   2. HERO VIDEO SCROLL BLUR
-   ========================================================================= */
-
-function initHeroVideoScrollEffect() {
-  const video = document.getElementById('hero-video');
-  if (!video) return;
-
-  const hero = video.closest('.hero');
-  if (!hero) return;
-
-  let raf = null;
-
-  const update = () => {
-    raf = null;
-    const rect = hero.getBoundingClientRect();
-    const heroHeight = hero.offsetHeight;
-    const progress = Math.min(1, Math.max(0, -rect.top / (heroHeight * 0.75)));
-    const blur = progress * 18;
-    video.style.setProperty('--hero-blur', `${blur}px`);
-  };
-
-  const onScroll = () => {
-    if (raf) return;
-    raf = requestAnimationFrame(update);
-  };
-
-  window.addEventListener('scroll', onScroll, { passive: true });
-  update();
-}
-
-
 /* =========================================================================
    3. LENIS SMOOTH SCROLL
    ========================================================================= */
