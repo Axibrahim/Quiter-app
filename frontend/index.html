@@ -14,30 +14,30 @@
 </head>
 <body>
 
+  <!-- Persistent Three.js galaxy field — fixed, page-wide, sits behind everything -->
+  <canvas id="hero-galaxy-canvas" class="site-galaxy-canvas" aria-hidden="true"></canvas>
+
   <!-- Transient WebGL layer for the check-in bloom reward — invisible
        until triggered, sits above the whole page. -->
   <canvas id="bloom-canvas" aria-hidden="true"></canvas>
 
   <!-- ============================= HERO ============================= -->
-<section class="hero frame-section">
-  <section class="section section--glow wrap about" id="about"></section>
-  <section class="section wrap" id="philosophy"></section>
-  <section class="section wrap frame-section" id="philosophy"></section>
-  <canvas id="hero-galaxy-canvas" class="hero__galaxy-canvas" aria-hidden="true"></canvas>
-  <div class="hero__flower-stage" id="hero-flower-stage" aria-hidden="true">
-    <div class="hero__flower-layer" data-flower-layer="video">
-      <video src="assets/media/glass-flower.mp4" muted autoplay loop playsinline preload="auto"></video>
+  <section class="hero frame-section">
+    <div class="hero__flower-stage" id="hero-flower-stage" aria-hidden="true">
+      <div class="hero__flower-layer" data-flower-layer="video">
+        <video src="assets/media/glass-flower.mp4" muted autoplay loop playsinline preload="auto"></video>
+      </div>
+      <div class="hero__flower-layer" data-flower-layer="side">
+        <img src="assets/media/flower/side-view.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+      </div>
+      <div class="hero__flower-layer" data-flower-layer="top">
+        <img src="assets/media/flower/top-down.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+      </div>
+      <div class="hero__flower-layer" data-flower-layer="close">
+        <img src="assets/media/flower/close-up.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
+      </div>
     </div>
-    <div class="hero__flower-layer" data-flower-layer="side">
-      <img src="assets/media/flower/side-view.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
-    </div>
-    <div class="hero__flower-layer" data-flower-layer="top">
-      <img src="assets/media/flower/top-down.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
-    </div>
-    <div class="hero__flower-layer" data-flower-layer="close">
-      <img src="assets/media/flower/close-up.jpg" alt="" onerror="this.parentElement.classList.add('hero__flower-layer--noimg')" />
-    </div>
-  </div>
+
     <header class="nav">
       <div class="liquid-glass nav__pill">
         <div class="nav__left">
@@ -60,7 +60,8 @@
         </button>
       </div>
     </header>
-        <div class="site-menu" id="site-menu" aria-hidden="true">
+
+    <div class="site-menu" id="site-menu" aria-hidden="true">
       <canvas id="site-menu-canvas" aria-hidden="true"></canvas>
       <nav class="site-menu__links">
         <a href="#top" class="site-menu__link" data-menu-link>Home</a>
@@ -96,7 +97,7 @@
   <main>
 
     <!-- ============================= ABOUT ============================= -->
-    <section class="section section--glow wrap about frame-section" id="about"></section>
+    <section class="section section--glow wrap about frame-section" id="about">
       <p class="eyebrow" data-reveal>What is Quiter</p>
       <h2 class="h2" data-reveal style="max-width: 18ch; margin-bottom: var(--space-3);">
         A structured way to become <em class="serif-italic">someone new</em> — not just quit something old.
@@ -109,7 +110,7 @@
       </p>
     </section>
 
-<section class="section wrap frame-section" id="philosophy">
+    <section class="section wrap frame-section" id="philosophy">
       <h2 class="h2 philosophy__heading" data-reveal>Break <em class="serif-italic">x</em> Build</h2>
       <div class="philosophy-grid">
         <div class="liquid-glass liquid-glass--panel philosophy__visual" data-reveal aria-hidden="true">🌸</div>
@@ -126,7 +127,7 @@
       </div>
     </section>
 
-    <section class="section wrap frame-section">  
+    <section class="section wrap frame-section">
       <p class="eyebrow" data-reveal>Why identity, not willpower</p>
       <h2 class="h2" data-reveal style="max-width: 18ch;">Willpower runs out. Identity doesn't.</h2>
       <p class="lede" data-reveal style="max-width: 60ch; margin-top: var(--space-2);">
@@ -151,8 +152,8 @@
     </section>
 
     <!-- ============================= HOW IT WORKS ============================= -->
-    <section class="section wrap frame-section" id="how-it-works"></section>
-    <p class="eyebrow" data-reveal>How it works</p>
+    <section class="section wrap frame-section" id="how-it-works">
+      <p class="eyebrow" data-reveal>How it works</p>
       <h2 class="h2" data-reveal>Three small things, every day</h2>
       <div class="steps-grid">
         <div class="liquid-glass liquid-glass--panel step-card" data-reveal>
@@ -168,14 +169,14 @@
         <div class="liquid-glass liquid-glass--panel step-card" data-reveal>
           <p class="step-card__index">03</p>
           <h3 class="step-card__title">Discipline over willpower</h3>
-          <p class="step-card__body">Stay disciplined, daily accountability check-ins, and progress tracking.</p></p>
+          <p class="step-card__body">Stay disciplined, daily accountability check-ins, and progress tracking.</p>
         </div>
       </div>
     </section>
 
     <!-- ============================= SERVICES ============================= -->
-  <section class="section wrap frame-section" id="services"></section>
-    <div class="services__head">
+    <section class="section wrap frame-section" id="services">
+      <div class="services__head">
         <h2 class="h2" data-reveal>What Quiter gives you</h2>
         <p class="eyebrow" data-reveal>Two ways to change</p>
       </div>
@@ -207,7 +208,7 @@
 
     <!-- ============================= PLANS (functional) ============================= -->
     <section class="section wrap frame-section" id="plans">
-        <div class="section__head">
+      <div class="section__head">
         <div>
           <p class="eyebrow" data-reveal>Choose your identity</p>
           <h2 class="h2" data-reveal>Every plan maps to who you're becoming</h2>
@@ -314,6 +315,6 @@
   <script type="module" src="assets/js/three/hero-flower.js"></script>
   <script type="module" src="assets/js/three/hero-galaxy-boot.js"></script>
   <script type="module" src="assets/js/frame-snap.js"></script>
-  <script type="module" src="assets/js/three/site-menu.js"></script></body>
+  <script type="module" src="assets/js/three/site-menu.js"></script>
 </body>
 </html>
