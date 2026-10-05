@@ -78,7 +78,7 @@ export class HeroGalaxy {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(
       new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-      0.5, 0.4, 0
+      0.28, 0.25, 0.15
     );
     this.composer.addPass(this.bloom);
 
@@ -98,10 +98,10 @@ export class HeroGalaxy {
   }
 
   _buildField() {
-    const N = this.isMobile ? 12000 : 28000; // scaled down from the 200k reference for real perf
-    const K = 40; // galaxy "frames" — scaled down from 107
-    const SP = 12.5;
-    const R = 1.7;
+    const N = this.isMobile ? 9000 : 20000; // fewer points, but each one crisp instead of blobby
+    const K = 90; // more, smaller clusters spread wider = a field, not a handful of smears
+    const SP = 22;
+    const R = 1.1;
 
     const positions = new Float32Array(N * 3);
     const shells = new Float32Array(N);
@@ -137,7 +137,7 @@ export class HeroGalaxy {
       positions[i * 3 + 1] = tmp.y;
       positions[i * 3 + 2] = tmp.z;
       shells[i] = rad;
-      sizes[i] = 5 + 7 * Math.random();
+      sizes[i] = 1.4 + 2.2 * Math.random();
       ids[i] = Math.random();
     }
 
@@ -168,7 +168,7 @@ export class HeroGalaxy {
     });
 
     this.points = new THREE.Points(geo, this.material);
-    this.points.position.z = -6;
+    this.points.position.z = -12;
     this.scene.add(this.points);
     this.geo = geo;
   }

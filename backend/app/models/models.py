@@ -18,7 +18,7 @@ import enum
 from datetime import datetime, date
 
 from sqlalchemy import (
-    Column, String, Boolean, Integer, Date, DateTime, ForeignKey,
+    Column, String, Boolean, Integer, Float, Date, DateTime, ForeignKey,
     Enum, Text, UniqueConstraint, CheckConstraint, Index, func
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -207,6 +207,7 @@ class UserPlan(db.Model):
     user = relationship("User", back_populates="plans")
     template = relationship("PlanTemplate")
     logs = relationship("DailyLog", back_populates="user_plan", cascade="all, delete-orphan")
+    exercise_logs = relationship("ExerciseLog", back_populates="user_plan", cascade="all, delete-orphan")
 
     __table_args__ = (
         # A user may only have ONE active (not completed/abandoned) instance
@@ -256,3 +257,30 @@ class ProgressVideo(db.Model):
     video_url = Column(String(500), nullable=False)
     day_number = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+
+class ExerciseLog(db.Model):
+    """One number per tracked exercise per day (reps, kg, minutes, km...).
+    Feeds the per-exercise graphs and the coach diagnosis. Separate from
+    DailyLog on purpose: DailyLog answers "did you show up", this answers
+    "how did it go"."""
+    __tablename__ = "exercise_logs"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False)
+
+    log_date = Column(Date, nullable=False, default=date.today)
+    exercise_key = Column(String(60), nullable=False)
+    value = Column(Float, nullable=False)
+
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    user_plan = relationship("UserPlan", back_populates="exercise_logs")
+
+    __table_args__ = (
+        UniqueConstraint("user_plan_id", "log_date", "exercise_key", name="uq_one_exercise_log_per_day"),
+        CheckConstraint("value >= 0 AND value <= 100000", name="ck_exercise_value_range"),
+        Index("ix_exercise_logs_plan_exercise_date", "user_plan_id", "exercise_key", "log_date"),
+    )

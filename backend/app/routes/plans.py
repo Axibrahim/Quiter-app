@@ -1,18 +1,29 @@
 """
 Plan routes — /api/v1/plans/*
 
-Handles the identity-based plan catalog (read-only templates) and a user's
-live plan instances. Every write is scoped to g.current_user.id so a user
-can never mutate another user's plan by guessing a UUID (IDOR protection —
-the WHERE clause always includes user_id, enforced at the query layer, not
-just "checked after the fact").
+Handles the plan catalog (read-only templates), a user's live plan
+instances, the athlete exercise tracker, and the analytics/diagnosis feed.
+Every write is scoped to g.current_user.id so a user can never mutate
+another user's plan by guessing a UUID (IDOR protection — the WHERE clause
+always includes user_id, enforced at the query layer, not "checked after
+the fact").
 """
-from datetime import date, timedelta
+import math
 import re
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
-from flask import Blueprint, request, jsonify, g
 
-from app.models.models import db, PlanTemplate, PlanDay, UserPlan, DailyLog, LogStatus, ProgressVideo, gen_uuid
+from flask import Blueprint, request, jsonify, g
+from sqlalchemy.exc import IntegrityError
+
+from app.models.models import (
+    db, PlanTemplate, PlanDay, UserPlan, DailyLog, LogStatus, HabitDirection,
+    ProgressVideo, ExerciseLog, gen_uuid,
+)
+from app.data.exercise_catalog import (
+    CATALOG, METRICS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
+)
+from app.utils.analytics import build_analytics
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
 from app.security.limiter import limiter, HABIT_LOG_RATE_LIMIT
@@ -23,12 +34,36 @@ plans_bp = Blueprint("plans", __name__, url_prefix="/api/v1/plans")
 REMINDER_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 SUPPORT_STYLES = {"gentle", "focused", "reflective"}
 MAX_ACTIVE_PLANS = 3
+AUTO_QUIT_DAYS = 15
+VIDEO_FREQUENCIES = {"weekly", "monthly", None}
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _active_plan_count(user_id):
     return UserPlan.query.filter_by(
         user_id=user_id, is_completed=False, is_abandoned=False
     ).count()
+
+
+def _plan_type(user_plan):
+    if user_plan.athletic_metadata:
+        return "athletic"
+    if user_plan.template.category == "custom":
+        return "custom"
+    return "catalog"
+
+
+def _tracked_exercises(user_plan):
+    meta = user_plan.athletic_metadata or {}
+    items = meta.get("tracked_exercises")
+    return items if isinstance(items, list) else []
+
+
+def _current_day_number(user_plan, today):
+    return max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
 
 
 def _read_custom_settings(payload):
@@ -42,7 +77,6 @@ def _read_custom_settings(payload):
         (None, error_code)
     """
     length_days = payload.get("length_days")
-
     if (
         not isinstance(length_days, int)
         or isinstance(length_days, bool)
@@ -53,7 +87,6 @@ def _read_custom_settings(payload):
     identity_statement = payload.get("identity_statement") or ""
     if not isinstance(identity_statement, str):
         return None, "invalid_identity_statement"
-
     identity_statement = identity_statement.strip()
     if len(identity_statement) > 160:
         return None, "invalid_identity_statement"
@@ -65,194 +98,206 @@ def _read_custom_settings(payload):
     raw_times = payload.get("reminder_times", [])
     if raw_times is None:
         raw_times = []
-
     if not isinstance(raw_times, list) or len(raw_times) > 3:
         return None, "invalid_reminder_times"
 
     normalized_times = []
     for reminder_time in raw_times:
-        if (
-            not isinstance(reminder_time, str)
-            or not REMINDER_TIME_RE.fullmatch(reminder_time)
-        ):
+        if not isinstance(reminder_time, str) or not REMINDER_TIME_RE.fullmatch(reminder_time):
             return None, "invalid_reminder_times"
-
         if reminder_time not in normalized_times:
             normalized_times.append(reminder_time)
-
-    normalized_times.sort(
-        key=lambda value: int(value[:2]) * 60 + int(value[3:])
-    )
+    normalized_times.sort(key=lambda value: int(value[:2]) * 60 + int(value[3:]))
 
     reminder_timezone = payload.get("reminder_timezone") or "UTC"
-
-    if (
-        not isinstance(reminder_timezone, str)
-        or len(reminder_timezone) > 64
-    ):
+    if not isinstance(reminder_timezone, str) or len(reminder_timezone) > 64:
         return None, "invalid_timezone"
-
     try:
         ZoneInfo(reminder_timezone)
     except Exception:
         return None, "invalid_timezone"
 
     return (
-        (
-            length_days,
-            identity_statement,
-            support_style,
-            normalized_times,
-            reminder_timezone,
-        ),
+        (length_days, identity_statement, support_style, normalized_times, reminder_timezone),
         None,
     )
-
-
-EXERCISE_LIBRARY = [
-    "swimming", "boxing", "general workout", "calisthenics", "weight lifting",
-    "running", "cycling", "yoga", "hiit", "martial arts", "climbing",
-    "pilates", "crossfit", "rowing", "tennis", "basketball", "soccer", "dance",
-]
 
 
 def _read_athletic_payload(payload):
-    exercise_type = payload.get("exercise_type")
-    if exercise_type not in EXERCISE_LIBRARY:
-        return None, "invalid_exercise_type"
+    """
+    Validate the athlete setup.
 
-    progression_goal = (payload.get("progression_goal") or "").strip()
+    Payload:
+        sport:               key from the exercise catalog
+        progression_goal:    3-200 chars
+        tracked_exercises:   1..8 items, each either
+                               {"key": "<catalog exercise key>"}
+                             or a custom move
+                               {"label": "Cable fly", "metric": "reps"}
+    """
+    sport = payload.get("sport")
+    if not sport_exists(sport):
+        return None, "invalid_sport"
+
+    progression_goal = payload.get("progression_goal")
+    if not isinstance(progression_goal, str):
+        return None, "invalid_progression_goal"
+    progression_goal = progression_goal.strip()
     if not 3 <= len(progression_goal) <= 200:
         return None, "invalid_progression_goal"
 
-    custom_exercises = payload.get("custom_exercises") or []
-    if not isinstance(custom_exercises, list) or len(custom_exercises) > 4:
-        return None, "invalid_custom_exercises"
-    cleaned_exercises = []
-    for item in custom_exercises:
-        if not isinstance(item, str):
-            return None, "invalid_custom_exercises"
-        item = item.strip()
-        if item:
-            if len(item) > 60:
-                return None, "invalid_custom_exercises"
-            cleaned_exercises.append(item)
+    raw = payload.get("tracked_exercises")
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_TRACKED_EXERCISES:
+        return None, "invalid_tracked_exercises"
+
+    tracked, seen = [], set()
+    for item in raw:
+        if not isinstance(item, dict):
+            return None, "invalid_tracked_exercises"
+
+        if item.get("key") is not None:
+            entry = find_exercise(sport, item.get("key"))
+            if entry is None:
+                return None, "invalid_tracked_exercises"
+            normalized = {**entry, "custom": False}
+        else:
+            label = item.get("label")
+            metric = item.get("metric")
+            if not isinstance(label, str) or metric not in METRICS:
+                return None, "invalid_tracked_exercises"
+            label = label.strip()
+            if not 2 <= len(label) <= 60:
+                return None, "invalid_tracked_exercises"
+            key = custom_exercise_key(label)
+            if key == "custom-":
+                return None, "invalid_tracked_exercises"
+            normalized = {"key": key, "label": label, "metric": metric, "unit": METRICS[metric], "custom": True}
+
+        if normalized["key"] in seen:
+            continue
+        seen.add(normalized["key"])
+        tracked.append(normalized)
+
+    if not tracked:
+        return None, "invalid_tracked_exercises"
 
     return {
-        "exercise_type": exercise_type,
+        "sport": sport,
+        "sport_label": CATALOG[sport]["label"],
         "progression_goal": progression_goal,
-        "custom_exercises": cleaned_exercises,
+        "tracked_exercises": tracked,
     }, None
+
+
+def _add_plan_days(template, length_days, daily_action, identity_statement):
+    for day_number in range(1, length_days + 1):
+        db.session.add(
+            PlanDay(
+                template_id=template.id,
+                day_number=day_number,
+                micro_goal=f"Day {day_number}: {daily_action}",
+                identity_cue=identity_statement,
+                reward_tier=1,
+            )
+        )
+
+
+def _record_checkin(user_plan, status, note, today):
     """
-    Validate flexible custom-plan settings.
+    Shared check-in logic (used by /checkin and by /exercise-log).
+    Adds rows to the session but does NOT commit — the caller commits so the
+    whole request stays one transaction.
 
-    Returns:
-        ((length_days, identity_statement, support_style,
-          reminder_times, reminder_timezone), None)
-        or
-        (None, error_code)
+    Returns (result_dict, None) or (None, (error_code, http_status)).
     """
-    length_days = payload.get("length_days")
+    if user_plan.is_completed or user_plan.is_abandoned:
+        return None, ("plan_not_active", 409)
 
-    if (
-        not isinstance(length_days, int)
-        or isinstance(length_days, bool)
-        or not 3 <= length_days <= 365
-    ):
-        return None, "invalid_length_days"
+    if DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first():
+        return None, ("already_logged_today", 409)
 
-    identity_statement = payload.get("identity_statement") or ""
-    if not isinstance(identity_statement, str):
-        return None, "invalid_identity_statement"
+    day_number = _current_day_number(user_plan, today)
+    plan_day = PlanDay.query.filter_by(template_id=user_plan.template_id, day_number=day_number).first()
 
-    identity_statement = identity_statement.strip()
-    if len(identity_statement) > 160:
-        return None, "invalid_identity_statement"
+    db.session.add(DailyLog(
+        user_id=user_plan.user_id,
+        user_plan_id=user_plan.id,
+        plan_day_id=plan_day.id if plan_day else None,
+        log_date=today,
+        status=status,
+        note=(note or "")[:280] or None,
+    ))
 
-    support_style = payload.get("support_style") or "gentle"
-    if support_style not in SUPPORT_STYLES:
-        return None, "invalid_support_style"
+    if status == LogStatus.COMPLETED.value:
+        user_plan.current_streak += 1
+        user_plan.longest_streak = max(user_plan.longest_streak, user_plan.current_streak)
+        if day_number >= user_plan.template.length_days:
+            user_plan.is_completed = True
+    else:
+        # A missed day breaks the streak but does NOT end the plan — the plan
+        # survives a slip, by design.
+        user_plan.current_streak = 0
 
-    raw_times = payload.get("reminder_times", [])
-    if raw_times is None:
-        raw_times = []
+    # Any check-in at all counts as showing up and resets the 15-day auto-quit clock.
+    user_plan.last_checkin_date = today
 
-    if not isinstance(raw_times, list) or len(raw_times) > 3:
-        return None, "invalid_reminder_times"
+    return {
+        "status": status,
+        "current_streak": user_plan.current_streak,
+        "longest_streak": user_plan.longest_streak,
+        "is_completed": user_plan.is_completed,
+        "reward_tier": (plan_day.reward_tier if (plan_day and status == LogStatus.COMPLETED.value) else 0),
+    }, None
 
-    normalized_times = []
-    for reminder_time in raw_times:
-        if (
-            not isinstance(reminder_time, str)
-            or not REMINDER_TIME_RE.fullmatch(reminder_time)
-        ):
-            return None, "invalid_reminder_times"
 
-        if reminder_time not in normalized_times:
-            normalized_times.append(reminder_time)
+def _load_plan(user_plan_id):
+    """(user_plan, None) or (None, (json_response, status))."""
+    if not validate_uuid_param(user_plan_id):
+        return None, (jsonify({"error": "invalid_id"}), 400)
+    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
+    if user_plan is None:
+        return None, (jsonify({"error": "plan_not_found"}), 404)
+    return user_plan, None
 
-    normalized_times.sort(
-        key=lambda value: int(value[:2]) * 60 + int(value[3:])
-    )
 
-    reminder_timezone = payload.get("reminder_timezone") or "UTC"
-
-    if (
-        not isinstance(reminder_timezone, str)
-        or len(reminder_timezone) > 64
-    ):
-        return None, "invalid_timezone"
-
-    try:
-        ZoneInfo(reminder_timezone)
-    except Exception:
-        return None, "invalid_timezone"
-
-    return (
-        (
-            length_days,
-            identity_statement,
-            support_style,
-            normalized_times,
-            reminder_timezone,
-        ),
-        None,
-    )
-
+# ---------------------------------------------------------------------------
+# Dashboard / catalog
+# ---------------------------------------------------------------------------
 
 @plans_bp.route("/mine", methods=["GET"])
 @login_required
 def my_plans():
-    """List the current user's plans for the dashboard — active ones first,
-    each with today's micro-goal pre-computed so the dashboard doesn't need
-    a second round trip per plan."""
+    """List the current user's plans for the dashboard — each with today's
+    micro-goal pre-computed so the dashboard needs no per-plan round trip."""
+    today = date.today()
     user_plans = UserPlan.query.filter_by(user_id=g.current_user.id).order_by(UserPlan.created_at.desc()).all()
 
     out = []
     for up in user_plans:
-        day_number = max(1, min((date.today() - up.start_date).days + 1, up.template.length_days))
+        day_number = _current_day_number(up, today)
         plan_day = PlanDay.query.filter_by(template_id=up.template_id, day_number=day_number).first()
-        already_logged = DailyLog.query.filter_by(user_plan_id=up.id, log_date=date.today()).first()
+        already_logged = DailyLog.query.filter_by(user_plan_id=up.id, log_date=today).first()
+        meta = up.athletic_metadata or {}
         out.append({
             "user_plan_id": up.id,
             "template_id": up.template_id,
+            "plan_type": _plan_type(up),
             "category": up.template.category,
+            "sport_label": meta.get("sport_label"),
+            "tracked_exercise_count": len(_tracked_exercises(up)),
             "photo_url": up.template.photo_url,
             "title": up.template.title,
-            "identity_statement": up.template.identity_statement,
             "direction": up.template.direction.value,
             "day_number": day_number,
             "total_days": up.template.length_days,
             "current_streak": up.current_streak,
+            "longest_streak": up.longest_streak,
             "goal_text": up.goal_text or up.template.title,
-            "identity_statement": (
-                up.identity_statement or up.template.identity_statement
-            ),
+            "identity_statement": up.identity_statement or up.template.identity_statement,
             "support_style": up.support_style,
             "reminder_times": up.reminder_times or [],
             "reminder_timezone": up.reminder_timezone,
             "reminders_enabled": up.reminders_enabled,
-            "longest_streak": up.longest_streak,
             "is_completed": up.is_completed,
             "is_abandoned": up.is_abandoned,
             "micro_goal": plan_day.micro_goal if plan_day else None,
@@ -264,13 +309,11 @@ def my_plans():
 
 @plans_bp.route("/templates", methods=["GET"])
 def list_templates():
-    """Browse the identity-plan catalog. Deliberately PUBLIC (no
-    @login_required) — the whole point of the landing page's plan cards is
-    to let a logged-out visitor browse before they ever create an account.
-    Nothing in this response is user-specific or sensitive. Supports
-    ?direction=break|build and ?length=7|15|30 filters — both validated
-    against the Enum, so an arbitrary query string can never reach raw SQL.
-    arbitrary query string can never reach raw SQL."""
+    """Browse the plan catalog. Deliberately PUBLIC (no @login_required) so a
+    logged-out visitor can browse before creating an account. Nothing in this
+    response is user-specific. Supports ?direction=break|build and
+    ?length=7|15|30 filters — both validated, so an arbitrary query string
+    can never reach raw SQL."""
     direction = request.args.get("direction")
     length = request.args.get("length", type=int)
 
@@ -300,10 +343,23 @@ def list_templates():
     } for t in templates]), 200
 
 
+@plans_bp.route("/exercise-catalog", methods=["GET"])
+def get_exercise_catalog():
+    """Public: sports -> exercises (with metric + unit) for the athlete picker."""
+    return jsonify({
+        "max_tracked": MAX_TRACKED_EXERCISES,
+        "metrics": METRICS,
+        "sports": [
+            {"key": key, "label": sport["label"], "exercises": sport["exercises"]}
+            for key, sport in CATALOG.items()
+        ],
+    }), 200
+
+
 @plans_bp.route("/adopt", methods=["POST"])
 @login_required
 def adopt_plan():
-    """Start a plan. Refuses to double-enroll a user in the same template
+    """Start a catalog plan. Refuses to double-enroll in the same template
     while an active instance already exists."""
     payload = request.get_json(silent=True) or {}
     template_id = payload.get("template_id")
@@ -333,24 +389,21 @@ def adopt_plan():
     return jsonify({"user_plan_id": user_plan.id, "start_date": user_plan.start_date.isoformat()}), 201
 
 
+# ---------------------------------------------------------------------------
+# Daily loop
+# ---------------------------------------------------------------------------
+
 @plans_bp.route("/<user_plan_id>/today", methods=["GET"])
 @login_required
 def get_today(user_plan_id):
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
-    # Scoped by BOTH id and user_id in the same filter — this is the IDOR
-    # guard. A user supplying someone else's user_plan_id simply gets a 404,
-    # never another user's data.
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
-
-    day_number = (date.today() - user_plan.start_date).days + 1
-    day_number = max(1, min(day_number, user_plan.template.length_days))
-
+    today = date.today()
+    day_number = _current_day_number(user_plan, today)
     plan_day = PlanDay.query.filter_by(template_id=user_plan.template_id, day_number=day_number).first()
-    already_logged = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=date.today()).first()
+    already_logged = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first()
 
     return jsonify({
         "day_number": day_number,
@@ -367,86 +420,119 @@ def get_today(user_plan_id):
 @limiter.limit(HABIT_LOG_RATE_LIMIT)
 @login_required
 def checkin(user_plan_id):
-    """The core loop: mark today complete/missed/relapsed, recompute streak,
-    return the reward_tier so the frontend knows which Three.js bloom stage
-    to fire. Runs inside a single DB transaction so a crash mid-request
-    can never leave the streak counter and the log row out of sync."""
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
+    """The core loop: mark today complete/missed, recompute streak, return the
+    reward_tier so the frontend knows which bloom stage to fire. One DB
+    transaction, so the streak counter and the log row can never drift."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     payload = request.get_json(silent=True) or {}
     status_raw = payload.get("status")
     if status_raw not in [s.value for s in LogStatus]:
         return jsonify({"error": "invalid_status"}), 400
 
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    result, error = _record_checkin(user_plan, status_raw, payload.get("note"), date.today())
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "already_logged_today"}), 409
+
+    return jsonify(result), 200
+
+
+@plans_bp.route("/<user_plan_id>/exercise-log", methods=["POST"])
+@limiter.limit(HABIT_LOG_RATE_LIMIT)
+@login_required
+def log_exercises(user_plan_id):
+    """
+    Save today's numbers for the plan's tracked exercises (upsert — the user
+    can correct today's values). With "checkin": true it also records today's
+    check-in as completed, in the same transaction.
+
+    Body: {"entries": [{"exercise_key": "bench-press", "value": 80}, ...],
+           "checkin": true}
+    """
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
     if user_plan.is_completed or user_plan.is_abandoned:
         return jsonify({"error": "plan_not_active"}), 409
 
+    tracked = {ex["key"]: ex for ex in _tracked_exercises(user_plan)}
+    if not tracked:
+        return jsonify({"error": "no_tracked_exercises"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_TRACKED_EXERCISES:
+        return jsonify({"error": "invalid_entries"}), 400
+
+    cleaned = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return jsonify({"error": "invalid_entries"}), 400
+        key, value = entry.get("exercise_key"), entry.get("value")
+        if key not in tracked:
+            return jsonify({"error": "unknown_exercise"}), 400
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return jsonify({"error": "invalid_value"}), 400
+        if not math.isfinite(value) or not 0 <= value <= 100000:
+            return jsonify({"error": "invalid_value"}), 400
+        cleaned[key] = round(float(value), 2)
+
     today = date.today()
-    existing_log = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first()
-    if existing_log:
-        return jsonify({"error": "already_logged_today"}), 409
+    existing = {
+        row.exercise_key: row
+        for row in ExerciseLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).all()
+    }
+    for key, value in cleaned.items():
+        if key in existing:
+            existing[key].value = value
+        else:
+            db.session.add(ExerciseLog(
+                user_id=g.current_user.id,
+                user_plan_id=user_plan.id,
+                log_date=today,
+                exercise_key=key,
+                value=value,
+            ))
 
-    day_number = max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
-    plan_day = PlanDay.query.filter_by(template_id=user_plan.template_id, day_number=day_number).first()
+    checkin_result = None
+    if payload.get("checkin") is True:
+        already = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first()
+        if not already:
+            checkin_result, _ = _record_checkin(user_plan, LogStatus.COMPLETED.value, payload.get("note"), today)
 
-    log = DailyLog(
-        user_id=g.current_user.id,
-        user_plan_id=user_plan.id,
-        plan_day_id=plan_day.id if plan_day else None,
-        log_date=today,
-        status=status_raw,
-        note=(payload.get("note") or "")[:280] or None,
-    )
-    db.session.add(log)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "conflict"}), 409
 
-    if status_raw == LogStatus.COMPLETED.value:
-        user_plan.current_streak += 1
-        user_plan.longest_streak = max(user_plan.longest_streak, user_plan.current_streak)
-        if day_number >= user_plan.template.length_days:
-            user_plan.is_completed = True
-    else:
-        # Missed or relapsed day breaks the streak but does NOT end the
-        # plan — Quiter's whole design thesis is "the plan survives a slip",
-        # which is deliberately reflected here at the data layer.
-        user_plan.current_streak = 0
-
-    # Any check-in at all — completed, missed, or relapsed — counts as the
-    # user showing up. That's what resets the 15-day auto-quit clock, not
-    # just a "completed" streak.
-    user_plan.last_checkin_date = today
-
-    db.session.commit()
-
-    return jsonify({
-        "status": status_raw,
-        "current_streak": user_plan.current_streak,
-        "longest_streak": user_plan.longest_streak,
-        "is_completed": user_plan.is_completed,
-        "reward_tier": plan_day.reward_tier if (plan_day and status_raw == LogStatus.COMPLETED.value) else 0,
-    }), 200
+    return jsonify({"saved": cleaned, "checkin": checkin_result}), 200
 
 
-AUTO_QUIT_DAYS = 15
-
+# ---------------------------------------------------------------------------
+# Progress + analytics
+# ---------------------------------------------------------------------------
 
 @plans_bp.route("/<user_plan_id>/progress", methods=["GET"])
 @login_required
 def get_progress(user_plan_id):
-    """Everything the progression dashboard needs in one call: streaks,
-    completion, the auto-quit countdown, and a 30-day check-in heatmap."""
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
-
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    """Everything the progress header needs in one call: streaks, completion,
+    the auto-quit countdown, a 30-day heatmap, and (athlete plans) the
+    tracked exercises plus today's saved values."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     today = date.today()
-    day_number = max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
+    day_number = _current_day_number(user_plan, today)
     completion_pct = round((day_number / user_plan.template.length_days) * 100)
 
     days_since_checkin = (today - user_plan.last_checkin_date).days
@@ -467,9 +553,23 @@ def get_progress(user_plan_id):
 
     already_logged_today = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first() is not None
 
+    athletic = None
+    if user_plan.athletic_metadata:
+        meta = user_plan.athletic_metadata
+        today_rows = ExerciseLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).all()
+        athletic = {
+            "sport": meta.get("sport"),
+            "sport_label": meta.get("sport_label"),
+            "progression_goal": meta.get("progression_goal"),
+            "tracked_exercises": _tracked_exercises(user_plan),
+            "today_values": {row.exercise_key: row.value for row in today_rows},
+        }
+
     return jsonify({
         "user_plan_id": user_plan.id,
+        "plan_type": _plan_type(user_plan),
         "title": user_plan.template.title,
+        "goal_text": user_plan.goal_text or user_plan.template.title,
         "direction": user_plan.template.direction.value,
         "day_number": day_number,
         "total_days": user_plan.template.length_days,
@@ -485,7 +585,51 @@ def get_progress(user_plan_id):
         "is_completed": user_plan.is_completed,
         "is_abandoned": user_plan.is_abandoned,
         "heatmap": heatmap,
+        "athletic": athletic,
     }), 200
+
+
+@plans_bp.route("/<user_plan_id>/analytics", methods=["GET"])
+@login_required
+def get_analytics(user_plan_id):
+    """Graph data + coach diagnosis for ANY plan (catalog, custom, athletic).
+    ?days=7..180 sets the graph window (default 30)."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
+
+    window_days = request.args.get("days", default=30, type=int)
+    window_days = max(7, min(window_days or 30, 180))
+
+    logs = DailyLog.query.filter_by(user_plan_id=user_plan.id).all()
+    status_by_date = {log.log_date: log.status.value for log in logs}
+
+    tracked = _tracked_exercises(user_plan)
+    points = {}
+    if tracked:
+        rows = (
+            ExerciseLog.query.filter_by(user_plan_id=user_plan.id)
+            .order_by(ExerciseLog.log_date.asc())
+            .all()
+        )
+        for row in rows:
+            points.setdefault(row.exercise_key, []).append((row.log_date, row.value))
+
+    data = build_analytics(
+        start=user_plan.start_date,
+        today=date.today(),
+        length_days=user_plan.template.length_days,
+        status_by_date=status_by_date,
+        exercises=tracked,
+        points_by_exercise=points,
+        window_days=window_days,
+        current_streak=user_plan.current_streak,
+        longest_streak=user_plan.longest_streak,
+    )
+    data["user_plan_id"] = user_plan.id
+    data["plan_type"] = _plan_type(user_plan)
+    data["title"] = user_plan.template.title
+    return jsonify(data), 200
 
 
 @plans_bp.route("/<user_plan_id>/abandon", methods=["POST"])
@@ -493,43 +637,51 @@ def get_progress(user_plan_id):
 def abandon_plan(user_plan_id):
     """User-initiated exit — distinct from the worker's automatic 15-day
     abandon, but lands in the same is_abandoned flag either way."""
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
-
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     if user_plan.is_completed:
         return jsonify({"error": "plan_already_completed"}), 409
 
     user_plan.is_abandoned = True
     db.session.commit()
-
     return jsonify({"ok": True}), 200
+
+
+# ---------------------------------------------------------------------------
+# Custom plan creation
+# ---------------------------------------------------------------------------
+
+def _daily_action(support_style, target):
+    if support_style == "gentle":
+        return f"Take one small, kind step toward — {target}."
+    if support_style == "focused":
+        return f"Complete one clear action toward — {target}."
+    return f"Pause, notice what you need, and take one step toward — {target}."
 
 
 @plans_bp.route("/custom", methods=["POST"])
 @login_required
 def create_custom_plan():
     """
-    Create a flexible user-owned plan.
+    Create a flexible user-owned plan for ANY goal.
 
-    The generated PlanTemplate remains hidden from the public catalog,
-    while UserPlan stores the user's personal goal, support preferences,
-    reminder schedule, and timezone.
+    The generated PlanTemplate stays hidden from the public catalog, while
+    UserPlan stores the user's goal, support style, reminders and timezone.
+    "direction" is optional now (the app is a goal coach, not only
+    break/build) and defaults to "build".
     """
     payload = request.get_json(silent=True) or {}
 
     goal_text = payload.get("goal_text") or ""
     if not isinstance(goal_text, str):
         return jsonify({"error": "invalid_goal_text"}), 400
-
     goal_text = goal_text.strip()
     if not 3 <= len(goal_text) <= 160:
         return jsonify({"error": "invalid_goal_text"}), 400
 
-    direction = payload.get("direction")
+    direction = payload.get("direction") or "build"
     if direction not in ("break", "build"):
         return jsonify({"error": "invalid_direction"}), 400
 
@@ -540,64 +692,30 @@ def create_custom_plan():
     if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
         return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
-    (
-        length_days,
-        identity_statement,
-        support_style,
-        reminder_times,
-        reminder_timezone,
-    ) = settings
+    length_days, identity_statement, support_style, reminder_times, reminder_timezone = settings
 
     if not identity_statement:
         identity_statement = (
             "I am someone who is "
-            + (
-                "breaking free from "
-                if direction == "break"
-                else "building "
-            )
+            + ("breaking free from " if direction == "break" else "working toward ")
             + goal_text
             + "."
-        )
-
-    if support_style == "gentle":
-        daily_action = (
-            f"Take one small, kind step toward — {goal_text}."
-        )
-    elif support_style == "focused":
-        daily_action = (
-            f"Complete one clear action toward — {goal_text}."
-        )
-    else:
-        daily_action = (
-            f"Pause, notice what you need, and take one step toward — "
-            f"{goal_text}."
         )
 
     template = PlanTemplate(
         slug=f"custom-{gen_uuid()[:8]}",
         title=goal_text[:120],
         identity_statement=identity_statement,
-        direction=direction,
+        direction=HabitDirection(direction),
         category="custom",
         length_days=length_days,
         description="A flexible custom plan built by the user.",
         is_active=False,
     )
-
     db.session.add(template)
     db.session.flush()
 
-    for day_number in range(1, length_days + 1):
-        db.session.add(
-            PlanDay(
-                template_id=template.id,
-                day_number=day_number,
-                micro_goal=f"Day {day_number}: {daily_action}",
-                identity_cue=identity_statement,
-                reward_tier=1,
-            )
-        )
+    _add_plan_days(template, length_days, _daily_action(support_style, goal_text), identity_statement)
 
     user_plan = UserPlan(
         user_id=g.current_user.id,
@@ -610,33 +728,32 @@ def create_custom_plan():
         reminders_enabled=bool(reminder_times),
         start_date=date.today(),
     )
-
     db.session.add(user_plan)
     db.session.commit()
 
-    return jsonify(
-        {
-            "user_plan_id": user_plan.id,
-            "template_id": template.id,
-            "title": template.title,
-            "goal_text": goal_text,
-            "identity_statement": identity_statement,
-            "support_style": support_style,
-            "length_days": length_days,
-            "reminder_times": reminder_times,
-            "reminder_timezone": reminder_timezone,
-            "reminders_enabled": bool(reminder_times),
-            "start_date": user_plan.start_date.isoformat(),
-        }
-    ), 201
+    return jsonify({
+        "user_plan_id": user_plan.id,
+        "template_id": template.id,
+        "title": template.title,
+        "goal_text": goal_text,
+        "identity_statement": identity_statement,
+        "support_style": support_style,
+        "length_days": length_days,
+        "reminder_times": reminder_times,
+        "reminder_timezone": reminder_timezone,
+        "reminders_enabled": bool(reminder_times),
+        "start_date": user_plan.start_date.isoformat(),
+    }), 201
 
 
 @plans_bp.route("/custom-athletic", methods=["POST"])
 @login_required
 def create_athletic_plan():
-    """Same shape as create_custom_plan, but always 'build' direction and
-    carries exercise-specific metadata (type, goal, up to 4 custom moves)
-    in athletic_metadata rather than bloating UserPlan with niche columns."""
+    """
+    Athlete plan: pick a sport, then up to 8 exercises to track every day
+    (catalog moves and/or custom ones). Sport, goal and the tracked list live
+    in athletic_metadata (JSONB) rather than bloating UserPlan with columns.
+    """
     payload = request.get_json(silent=True) or {}
 
     athletic_fields, error = _read_athletic_payload(payload)
@@ -650,50 +767,36 @@ def create_athletic_plan():
     if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
         return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
-    (
-        length_days,
-        identity_statement,
-        support_style,
-        reminder_times,
-        reminder_timezone,
-    ) = settings
+    length_days, identity_statement, support_style, reminder_times, reminder_timezone = settings
 
-    exercise_label = athletic_fields["exercise_type"]
-    goal_text = f"{exercise_label} — {athletic_fields['progression_goal']}"[:160]
+    sport_label = athletic_fields["sport_label"]
+    progression_goal = athletic_fields["progression_goal"]
+    goal_text = f"{sport_label} — {progression_goal}"[:160]
 
     if not identity_statement:
-        identity_statement = f"I am someone who trains in {exercise_label} — {athletic_fields['progression_goal']}."
+        identity_statement = f"I am someone who trains in {sport_label} — {progression_goal}."[:160]
 
     if support_style == "gentle":
-        daily_action = f"Take one small, kind step toward — {athletic_fields['progression_goal']}."
+        daily_action = f"Train, log your numbers, and take one small, kind step toward — {progression_goal}."
     elif support_style == "focused":
-        daily_action = f"Complete one clear training action toward — {athletic_fields['progression_goal']}."
+        daily_action = f"Complete your training, log your numbers, and push toward — {progression_goal}."
     else:
-        daily_action = f"Pause, notice how your body feels, and train toward — {athletic_fields['progression_goal']}."
+        daily_action = f"Notice how your body feels, train, log your numbers, and move toward — {progression_goal}."
 
     template = PlanTemplate(
         slug=f"athletic-{gen_uuid()[:8]}",
-        title=goal_text,
+        title=goal_text[:120],
         identity_statement=identity_statement,
-        direction="build",
-        category=exercise_label,
+        direction=HabitDirection.BUILD,
+        category=athletic_fields["sport"],
         length_days=length_days,
-        description="A flexible athletic training plan built by the user.",
+        description="A personal athletic training plan built by the user.",
         is_active=False,
     )
     db.session.add(template)
     db.session.flush()
 
-    for day_number in range(1, length_days + 1):
-        db.session.add(
-            PlanDay(
-                template_id=template.id,
-                day_number=day_number,
-                micro_goal=f"Day {day_number}: {daily_action}",
-                identity_cue=identity_statement,
-                reward_tier=1,
-            )
-        )
+    _add_plan_days(template, length_days, daily_action, identity_statement)
 
     user_plan = UserPlan(
         user_id=g.current_user.id,
@@ -720,22 +823,16 @@ def create_athletic_plan():
     }), 201
 
 
-@plans_bp.route("/exercise-library", methods=["GET"])
-def get_exercise_library():
-    return jsonify(EXERCISE_LIBRARY), 200
-
-VIDEO_FREQUENCIES = {"weekly", "monthly", None}
-
+# ---------------------------------------------------------------------------
+# Progress videos
+# ---------------------------------------------------------------------------
 
 @plans_bp.route("/<user_plan_id>/videos", methods=["POST"])
 @login_required
 def upload_progress_video_route(user_plan_id):
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
-
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     file = request.files.get("video")
     if file is None:
@@ -746,8 +843,7 @@ def upload_progress_video_route(user_plan_id):
     except SupabaseStorageError as e:
         return jsonify({"error": str(e)}), 400
 
-    today = date.today()
-    day_number = max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
+    day_number = _current_day_number(user_plan, date.today())
 
     video = ProgressVideo(
         user_id=g.current_user.id,
@@ -769,15 +865,11 @@ def upload_progress_video_route(user_plan_id):
 @plans_bp.route("/<user_plan_id>/videos", methods=["GET"])
 @login_required
 def list_progress_videos(user_plan_id):
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
-
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     videos = ProgressVideo.query.filter_by(user_plan_id=user_plan.id).order_by(ProgressVideo.created_at.desc()).all()
-
     return jsonify([{
         "id": v.id,
         "video_url": v.video_url,
@@ -789,12 +881,9 @@ def list_progress_videos(user_plan_id):
 @plans_bp.route("/<user_plan_id>/video-frequency", methods=["PATCH"])
 @login_required
 def set_video_frequency(user_plan_id):
-    if not validate_uuid_param(user_plan_id):
-        return jsonify({"error": "invalid_id"}), 400
-
-    user_plan = UserPlan.query.filter_by(id=user_plan_id, user_id=g.current_user.id).first()
-    if user_plan is None:
-        return jsonify({"error": "plan_not_found"}), 404
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
 
     payload = request.get_json(silent=True) or {}
     frequency = payload.get("frequency")
@@ -803,5 +892,4 @@ def set_video_frequency(user_plan_id):
 
     user_plan.video_checkin_frequency = frequency
     db.session.commit()
-
     return jsonify({"video_checkin_frequency": frequency}), 200
