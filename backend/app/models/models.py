@@ -15,7 +15,7 @@ deletion (GDPR "right to erasure") cleanly removes dependent rows.
 """
 import uuid
 import enum
-from datetime import datetime, date
+from datetime import date
 
 from sqlalchemy import (
     Column, String, Boolean, Integer, Float, Date, DateTime, ForeignKey,
@@ -47,12 +47,6 @@ def gen_uuid():
 class HabitDirection(str, enum.Enum):
     BREAK = "break"      # quitting smoking, alcohol, doomscrolling...
     BUILD = "build"       # working out, meditating, journaling...
-
-
-class PlanLength(int, enum.Enum):
-    SEVEN = 7
-    FIFTEEN = 15
-    THIRTY = 30
 
 
 class LogStatus(str, enum.Enum):

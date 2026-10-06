@@ -17,8 +17,7 @@ endpoint (or the person just asking support) can still recover.
 """
 import os
 import logging
-from html import escape
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import resend
 

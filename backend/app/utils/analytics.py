@@ -11,7 +11,7 @@ Conventions
   * done         = DailyLog.status == "completed"
   * every exercise metric is higher-is-better (see data/exercise_catalog.py)
 """
-from datetime import date, timedelta
+from datetime import timedelta
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
