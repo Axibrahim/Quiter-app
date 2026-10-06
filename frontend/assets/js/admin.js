@@ -1,4 +1,3 @@
-import { requireAuth } from './modules/auth-state.js';
 import { api } from './modules/api-client.js';
 
 let editingId = null;
@@ -89,31 +88,31 @@ function closeForm() {
 
 function renderAdminCard(template) {
   const card = document.createElement('div');
-  card.className = 'liquid-glass liquid-glass--panel plan-card';
+  card.className = 'admin-card liquid-glass liquid-glass--panel';
 
   card.innerHTML = `
-    <div class="plan-card__photo" style="${template.photo_url ? '' : `--plan-glow: rgba(141,124,255,0.35);`}">
+    <div class="admin-card__photo">
       ${template.photo_url
-        ? `<img src="${template.photo_url}" alt="" style="width:100%; height:100%; object-fit:cover;" />`
+        ? `<img src="${escapeHtml(template.photo_url)}" alt="" />`
         : '🌱'}
     </div>
-    <div class="plan-card__body">
-      <span class="plan-card__direction plan-card__direction--${template.direction}">
+    <div class="stack" style="gap:.4rem">
+      <span class="badge">
         ${template.direction === 'break' ? 'Break' : 'Build'} · ${escapeHtml(template.category)}
       </span>
-      <h3 class="plan-card__title">${escapeHtml(template.title)}</h3>
-      <p class="plan-card__identity">"${escapeHtml(template.identity_statement)}"</p>
-      <div class="plan-card__meta">
+      <h3 class="card__title">${escapeHtml(template.title)}</h3>
+      <p>"${escapeHtml(template.identity_statement)}"</p>
+      <div class="admin-card__meta">
         <span>${template.length_days} days</span>
         <span>${template.is_active ? 'Active' : 'Hidden'}</span>
       </div>
-      <div class="plan-card__meta">
+      <div class="admin-card__meta">
         <span>${template.price_cents != null ? `$${(template.price_cents / 100).toFixed(2)}` : 'Free'}</span>
         <span>${template.trial_days ? `${template.trial_days}-day trial` : 'No trial'}</span>
       </div>
-      <div style="display:flex; gap: 0.5rem; margin-top: 0.4rem;">
-        <button class="liquid-glass btn btn--glass" data-edit style="flex:1;" type="button">Edit</button>
-        <button class="liquid-glass btn btn--glass" data-delete style="flex:1;" type="button">${template.is_active ? 'Hide' : 'Hidden'}</button>
+      <div class="admin-card__row">
+        <button class="btn btn--glass liquid-glass btn--sm" data-edit type="button">Edit</button>
+        <button class="btn btn--glass liquid-glass btn--sm" data-delete type="button">${template.is_active ? 'Hide' : 'Hidden'}</button>
       </div>
     </div>
   `;
@@ -157,16 +156,11 @@ async function handlePhotoUpload(file) {
   const formData = new FormData();
   formData.append('photo', file);
 
-  const res = await fetch('http://127.0.0.1:5000/api/v1/admin/upload-photo', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'X-Quiter-Client': 'web' },
-    body: formData,
-  });
-
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    status.textContent = `Upload failed: ${result.error || 'unknown error'}`;
+  let result;
+  try {
+    result = await api.upload('/admin/upload-photo', formData);
+  } catch (err) {
+    status.textContent = `Upload failed: ${err.message}`;
     return;
   }
 
@@ -178,10 +172,7 @@ async function handlePhotoUpload(file) {
   previewWrap.style.display = '';
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const user = await requireAuth();
-  if (!user) return;
-
+export async function initAdmin(user) {
   if (!user.is_admin) {
     alert("You don't have access to this page.");
     window.location.href = 'dashboard.html';
@@ -221,4 +212,4 @@ document.addEventListener('DOMContentLoaded', async () => {
       submitBtn.disabled = false;
     }
   });
-});
+}

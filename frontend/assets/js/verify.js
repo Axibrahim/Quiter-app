@@ -1,26 +1,25 @@
 import { api } from './modules/api-client.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const title = document.getElementById('verify-title');
-  const body = document.getElementById('verify-body');
-  const homeLink = document.getElementById('verify-home-link');
+const $ = (id) => document.getElementById(id);
+const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const CROSS = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
-  const token = new URLSearchParams(window.location.search).get('token');
-  if (!token) {
-    title.textContent = 'Missing verification link';
-    body.textContent = 'This page needs a token in the URL — use the link from your email.';
-    homeLink.style.display = 'inline-flex';
-    return;
-  }
+function done(ok, title, body) {
+  $('v-icon').className = 'result__icon' + (ok ? '' : ' result__icon--error');
+  $('v-icon').innerHTML = ok ? CHECK : CROSS;
+  $('verify-title').textContent = title;
+  $('verify-body').textContent = body;
+  $('verify-home').hidden = false;
+}
 
+(async () => {
+  const token = new URLSearchParams(location.search).get('token');
+  history.replaceState(null, '', location.pathname);
+  if (!token) { done(false, 'Missing verification link', 'Use the link from your email.'); return; }
   try {
     await api.post('/auth/verify/confirm', { token });
-    title.textContent = "You're verified! ✨";
-    body.textContent = 'Your email is confirmed. You can head back to Quiter now.';
-  } catch (err) {
-    title.textContent = 'That link has expired';
-    body.textContent = 'Verification links are valid for 48 hours. Request a new one from your profile page.';
-  } finally {
-    homeLink.style.display = 'inline-flex';
+    done(true, "You're verified", 'Your email is confirmed. Welcome to Quiter.');
+  } catch {
+    done(false, 'That link has expired', 'Verification links last 48 hours. Request a new one from your profile page.');
   }
-});
+})();

@@ -1,146 +1,56 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Build an Athletic Plan — Quiter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<title>Athlete plan — Quiter</title>
 </head>
-<body style="background: var(--bg);">
-
-  <header class="nav wrap" style="position: sticky; top: 0;">
-    <div class="liquid-glass nav__pill">
-      <div class="nav__left">
-        <a href="index.html" class="nav__mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
-          Quiter
-        </a>
-        <nav class="nav__links">
-          <a href="plans.html">Plans</a>
-          <a href="index.html#about">About</a>
-        </nav>
-      </div>
-      <div class="nav__right" id="nav-auth-slot"></div>
+<body>
+<main class="page page--narrow">
+  <div class="wrap">
+    <a class="back" href="plans.html">← Back</a>
+    <div class="page-head">
+      <p class="eyebrow">Athlete plan</p>
+      <h1 class="h2">Pick your sport. <em>Pick your numbers.</em></h1>
+      <p>Choose what you train and which exercises you want to track every day.</p>
     </div>
-  </header>
+    <form id="plan-form" novalidate>
+      <section class="group liquid-glass liquid-glass--panel">
+        <p class="group__label">1 · Sport</p>
+        <div class="chips" id="sports" role="radiogroup" aria-label="Sport"><span class="field__hint">Loading sports…</span></div>
+      </section>
 
-  <main class="wrap custom-plan-page">
-    <a href="dashboard.html" class="custom-plan-page__back">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-      Back to dashboard
-    </a>
+      <section class="group liquid-glass liquid-glass--panel" id="ex-group" hidden>
+        <p class="group__label">2 · Exercises to track <span class="optional" id="ex-count">0 / 8</span></p>
+        <div class="chips" id="exercises"></div>
+        <p class="group__label" style="margin-top:1.6rem">Something else? <span class="optional">Custom</span></p>
+        <div class="pick-rows" id="custom-rows"></div>
+        <button class="btn btn--glass liquid-glass btn--sm" type="button" id="add-custom" style="margin-top:.8rem">+ Add your own exercise</button>
+      </section>
 
-    <div class="custom-plan-page__intro">
-      <p class="custom-plan__eyebrow">Train with structure.</p>
-      <h1 class="h2">Build an athletic plan</h1>
-      <p class="custom-plan__intro">
-        Pick your discipline, set a real progression goal, and Quiter will
-        track it the same way it tracks every other habit — one day at a time.
-      </p>
-    </div>
-
-    <div class="liquid-glass liquid-glass--panel custom-plan-page__panel">
-      <form id="athletic-form">
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Discipline</p>
-          <p class="custom-plan__hint">Choose the one you're focused on right now.</p>
-          <div class="exercise-library" id="exercise-library"></div>
+      <section class="group liquid-glass liquid-glass--panel">
+        <p class="group__label">3 · Your target</p>
+        <div class="field" style="margin:0">
+          <label for="goal">What do you want to reach? <span class="counter" id="goal-count">0 / 200</span></label>
+          <textarea id="goal" maxlength="200" placeholder="e.g. Bench 100 kg for 5 reps, run 10 km under 50 minutes…" required></textarea>
         </div>
+      </section>
 
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Your progression goal</p>
-          <div class="modal__field">
-            <label for="athletic-goal">What are you working toward?</label>
-            <textarea
-              id="athletic-goal"
-              maxlength="200"
-              placeholder="e.g. swim 1km without stopping, or hit a 100kg deadlift"
-              required
-            ></textarea>
-            <div class="custom-plan__counter" id="athletic-goal-count">0 / 200</div>
-          </div>
-        </div>
-
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Custom exercises <span class="custom-plan__optional">Optional — up to 4</span></p>
-          <p class="custom-plan__hint">Specific moves you want folded into this plan.</p>
-          <div id="custom-exercise-rows"></div>
-          <button type="button" class="liquid-glass btn btn--glass" id="add-exercise-btn" style="margin-top: 0.5rem;">+ Add exercise</button>
-        </div>
-
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Pace</p>
-          <div class="modal__field">
-            <div class="custom-plan__range-heading">
-              <label for="athletic-length">Plan period</label>
-              <output id="athletic-length-output" for="athletic-length">30 days</output>
-            </div>
-            <input id="athletic-length" type="range" min="3" max="365" value="30" step="1" />
-            <div class="custom-plan__range-labels">
-              <span>3 days</span>
-              <span>365 days</span>
-            </div>
-            <div class="custom-plan__presets" aria-label="Plan length presets">
-              <button type="button" data-plan-preset="7">7</button>
-              <button type="button" data-plan-preset="15">15</button>
-              <button type="button" data-plan-preset="30">30</button>
-              <button type="button" data-plan-preset="60">60</button>
-              <button type="button" data-plan-preset="90">90</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Identity &amp; support</p>
-          <div class="modal__field">
-            <label for="athletic-identity">
-              Identity statement <span class="custom-plan__optional">Optional</span>
-            </label>
-            <input id="athletic-identity" type="text" maxlength="160" placeholder="e.g. I am an athlete in training." />
-          </div>
-          <div class="modal__field">
-            <label>How should Quiter support you?</label>
-            <div class="modal__radio-row">
-              <label><input type="radio" name="athletic-support-style" value="gentle" checked /><span>Gentle</span></label>
-              <label><input type="radio" name="athletic-support-style" value="focused" /><span>Focused</span></label>
-              <label><input type="radio" name="athletic-support-style" value="reflective" /><span>Reflective</span></label>
-            </div>
-          </div>
-        </div>
-
-        <div class="liquid-glass custom-plan__group">
-          <p class="custom-plan__group-label">Reminder emails <span class="custom-plan__optional">Optional</span></p>
-          <div class="custom-plan__reminders">
-            <label class="custom-plan__reminder-row" data-reminder-row>
-              <span class="custom-plan__reminder-label"><input type="checkbox" data-reminder-toggle /><span>Morning</span></span>
-              <input type="time" value="09:00" data-reminder-time disabled />
-            </label>
-            <label class="custom-plan__reminder-row" data-reminder-row>
-              <span class="custom-plan__reminder-label"><input type="checkbox" data-reminder-toggle /><span>Afternoon</span></span>
-              <input type="time" value="14:00" data-reminder-time disabled />
-            </label>
-            <label class="custom-plan__reminder-row" data-reminder-row>
-              <span class="custom-plan__reminder-label"><input type="checkbox" data-reminder-toggle /><span>Evening</span></span>
-              <input type="time" value="20:00" data-reminder-time disabled />
-            </label>
-          </div>
-        </div>
-
-        <p class="modal__error" id="athletic-error"></p>
-        <button class="btn btn--solid modal__submit" type="submit">Create my training plan</button>
-      </form>
-    </div>
-  </main>
-
-  <footer class="footer wrap">
-    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
-    <span>Privacy · Terms · Contact</span>
-  </footer>
-
-  <script src="assets/js/mobile-nav.js"></script>
-  <script type="module" src="assets/js/custom-plan-athletics.js"></script>
+      <div id="common"></div>
+      <p class="error" id="form-error" role="alert"></p>
+      <button class="btn btn--solid" type="submit" id="submit" style="width:100%">Create my athlete plan</button>
+    </form>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import './assets/js/custom-plan-athletics.js';
+  initShell({ active: 'plans', auth: 'required' });
+</script>
 </body>
 </html>

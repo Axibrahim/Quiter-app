@@ -1,112 +1,179 @@
-import { requireAuth, logout } from './modules/auth-state.js';
-import { api } from './modules/api-client.js';
-import { BloomScene } from './three/bloom-scene.js';
+/**
+ * Dashboard: one glass card per plan.
+ *  - the circle checkbox marks today complete (athletes: saves their numbers too)
+ *  - the coach message loads per plan (AI when configured, templates otherwise)
+ *  - "I missed today" needs a second tap to confirm (it resets the streak)
+ */
+import { api, errorText } from './modules/api-client.js';
 
-function directionLabel(direction) {
-  return direction === 'break' ? 'Break' : 'Build';
+const MAX_PLANS = 3;
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const listEl = document.getElementById('plans');
+const errEl = document.getElementById('dash-error');
+let plans = [];
+
+// Athlete goals are stored as "Sport — target"; the sport already shows as a badge.
+const cleanGoal = (p) => (p.sport_label && p.goal_text.startsWith(`${p.sport_label} — `) ? p.goal_text.slice(p.sport_label.length + 3) : p.goal_text);
+
+function exerciseInputs(p) {
+  if (p.plan_type !== 'athletic' || !p.tracked_exercises.length) return '';
+  const locked = p.already_logged_today || p.is_completed;
+  return `<div class="ex-grid">${p.tracked_exercises.map((ex) => {
+    const v = p.today_values?.[ex.key];
+    return `<div class="ex-input"><label for="ex-${esc(p.user_plan_id)}-${esc(ex.key)}">${esc(ex.label)}</label>
+      <div><input id="ex-${esc(p.user_plan_id)}-${esc(ex.key)}" data-key="${esc(ex.key)}" type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="${v ?? ''}" ${locked ? 'disabled' : ''}><span>${esc(ex.unit)}</span></div></div>`;
+  }).join('')}</div>`;
 }
 
-function renderPlanCard(plan) {
-  const pctDone = Math.round((plan.day_number / plan.total_days) * 100);
-  const disabled = plan.already_logged_today || plan.is_completed;
+function cardHtml(p) {
+  const pct = Math.min(100, Math.round((p.day_number / p.total_days) * 100));
+  const athlete = p.plan_type === 'athletic';
+  const done = p.already_logged_today || p.is_completed;
+  const coach = p.is_completed ? '' : `
+    <div class="coach ${p.coach_message ? '' : 'is-loading'}" data-coach>
+      <p class="coach__label">Your coach</p><p class="coach__text">${esc(p.coach_message || 'Writing today’s message…')}</p></div>`;
 
-  const wrapper = document.createElement('div');
-  wrapper.className = 'liquid-glass liquid-glass--panel bento-cell';
-  wrapper.style.padding = 'var(--space-4)';
-  wrapper.innerHTML = `
-    <p class="today-card__day">Day ${plan.day_number} of ${plan.total_days} — ${plan.title} (${directionLabel(plan.direction)})</p>
-    <h3 class="today-card__goal">${plan.micro_goal ? escapeHtml(plan.micro_goal) : 'Plan complete 🎉'}</h3>
-    ${plan.identity_cue ? `<p class="today-card__cue">${escapeHtml(plan.identity_cue)}</p>` : ''}
-    <div style="display:flex; gap: var(--space-3); margin: var(--space-2) 0; font-family: var(--font-mono); font-size:0.85rem; color: var(--ink-40);">
-      <span>${plan.current_streak} day streak</span>
-      <span>${plan.longest_streak} longest</span>
-      <span>${pctDone}% through</span>
+  const checkLabel = p.is_completed ? 'Plan complete' : done ? 'Marked as on track' : "Yes, I'm on track today";
+  const video = p.video_checkin_frequency && !p.is_completed
+    ? `<a class="btn btn--text btn--sm" href="progress.html?plan=${esc(p.user_plan_id)}#video">Video check-in</a>` : '';
+
+  return `
+  <article class="plan liquid-glass liquid-glass--panel ${done ? 'is-done' : ''}" data-id="${esc(p.user_plan_id)}">
+    <div class="plan__top"><span class="badge ${athlete ? 'badge--athlete' : ''}">${athlete ? esc(p.sport_label || 'Athlete') : 'Personal'}</span>
+      <span class="plan__day">Day ${p.day_number} of ${p.total_days}</span></div>
+    <h2 class="plan__title">${esc(cleanGoal(p))}</h2>
+    <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+    <div class="plan__stats"><span>Streak <b>${p.current_streak}</b></span><span>Best <b>${p.longest_streak}</b></span></div>
+    ${coach}
+    ${!p.is_completed && p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
+    ${!p.is_completed && p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
+    ${exerciseInputs(p)}
+    <p class="error" data-error role="alert"></p>
+    <div class="plan__actions">
+      <label class="q-check q-check--lg"><input type="checkbox" data-done ${done ? 'checked disabled' : ''}><span class="q-check__box"></span><span class="q-check__label">${checkLabel}</span></label>
+      <div class="plan__links">
+        ${athlete && !done ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-save>Save numbers</button>' : ''}
+        ${!done ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>' : ''}
+        ${video}
+        <a class="btn btn--text btn--sm" href="progress.html?plan=${esc(p.user_plan_id)}">Progress</a>
+      </div>
     </div>
-    <div class="today-card__actions">
-      <button class="btn btn--solid" data-checkin="completed" data-plan-id="${plan.user_plan_id}" ${disabled ? 'disabled' : ''} type="button">
-        ${plan.already_logged_today ? 'Already checked in today' : 'Mark complete'}
-      </button>
-      <button class="liquid-glass btn btn--glass" data-checkin="missed" data-plan-id="${plan.user_plan_id}" ${disabled ? 'disabled' : ''} type="button">I slipped today</button>
-      <a class="liquid-glass btn btn--glass" href="progress.html?plan=${plan.user_plan_id}">View progress</a>
-    </div>
-  `;
-  return wrapper;
+  </article>`;
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+function render() {
+  const active = plans.filter((p) => !p.is_abandoned && !p.is_completed).length;
+  document.getElementById('new-plan').hidden = active >= MAX_PLANS;
+  if (!plans.length) {
+    listEl.innerHTML = `<div class="empty liquid-glass liquid-glass--panel"><h2 class="h3">No plan yet</h2>
+      <p>Pick athlete or personal coaching and your coach will take it from there.</p>
+      <a class="btn btn--solid" href="plans.html">Build my first plan</a></div>`;
+    return;
+  }
+  listEl.innerHTML = plans.map(cardHtml).join('');
 }
 
-async function loadPlans(bloomScene) {
-  const loading = document.getElementById('plans-loading');
-  const empty = document.getElementById('plans-empty');
-  const list = document.getElementById('plans-list');
+function replaceCard(p) {
+  const old = listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"]`);
+  if (old) old.outerHTML = cardHtml(p);
+}
 
-  list.innerHTML = '';
-  loading.style.display = '';
-  empty.style.display = 'none';
+function readEntries(card) {
+  return [...card.querySelectorAll('.ex-input input')]
+    .filter((i) => i.value !== '' && Number(i.value) >= 0)
+    .map((i) => ({ exercise_key: i.dataset.key, value: Number(i.value) }));
+}
 
+async function loadCoachMessages() {
+  await Promise.all(plans.filter((p) => !p.coach_message && !p.is_completed && !p.is_abandoned).map(async (p) => {
+    try {
+      const { message } = await api.get(`/plans/${p.user_plan_id}/coach-message`);
+      if (message) p.coach_message = message;
+    } catch { /* keep the placeholder text out: fall back to nothing */ }
+    const box = listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"] [data-coach]`);
+    if (!box) return;
+    if (p.coach_message) { box.classList.remove('is-loading'); box.querySelector('.coach__text').textContent = p.coach_message; }
+    else box.remove();
+  }));
+}
+
+async function complete(card, p) {
+  const entries = p.plan_type === 'athletic' ? readEntries(card) : [];
+  let result;
+  if (entries.length) {
+    ({ checkin: result } = await api.post(`/plans/${p.user_plan_id}/exercise-log`, { entries, checkin: true }));
+    entries.forEach((e) => { p.today_values[e.exercise_key] = e.value; });
+  } else {
+    result = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'completed' });
+  }
+  p.already_logged_today = true;
+  if (result) { p.current_streak = result.current_streak; p.longest_streak = Math.max(p.longest_streak, result.longest_streak ?? result.current_streak); p.is_completed = !!result.is_completed; }
+}
+
+listEl.addEventListener('change', async (e) => {
+  const box = e.target.closest('[data-done]');
+  if (!box || !box.checked) return;
+  const card = box.closest('.plan');
+  const p = plans.find((x) => x.user_plan_id === card.dataset.id);
+  const err = card.querySelector('[data-error]');
+  err.textContent = '';
+  box.disabled = true;
   try {
-    const plans = await api.get('/plans/mine');
-    loading.style.display = 'none';
+    await complete(card, p);
+    replaceCard(p);
+  } catch (ex) {
+    box.checked = false; box.disabled = false;
+    if (ex.message === 'already_logged_today') { p.already_logged_today = true; replaceCard(p); return; }
+    err.textContent = errorText(ex.message);
+  }
+});
 
-    const active = plans.filter((p) => !p.is_abandoned);
-    if (active.length === 0) {
-      empty.style.display = '';
+listEl.addEventListener('click', async (e) => {
+  const card = e.target.closest('.plan');
+  if (!card) return;
+  const p = plans.find((x) => x.user_plan_id === card.dataset.id);
+  const err = card.querySelector('[data-error]');
+
+  const save = e.target.closest('[data-save]');
+  if (save) {
+    const entries = readEntries(card);
+    if (!entries.length) { err.textContent = 'Enter at least one number first.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await api.post(`/plans/${p.user_plan_id}/exercise-log`, { entries });
+      entries.forEach((en) => { p.today_values[en.exercise_key] = en.value; });
+      save.textContent = 'Saved ✓';
+      setTimeout(() => { save.textContent = 'Save numbers'; save.disabled = false; }, 1600);
+    } catch (ex) { err.textContent = errorText(ex.message); save.disabled = false; }
+    return;
+  }
+
+  const miss = e.target.closest('[data-miss]');
+  if (miss) {
+    if (!miss.classList.contains('is-confirming')) {
+      miss.classList.add('is-confirming'); miss.textContent = 'Tap again to confirm';
+      setTimeout(() => { miss.classList.remove('is-confirming'); miss.textContent = 'I missed today'; }, 4000);
       return;
     }
+    try {
+      const r = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'missed' });
+      p.already_logged_today = true; p.current_streak = r.current_streak ?? 0;
+      replaceCard(p);
+    } catch (ex) { err.textContent = errorText(ex.message); }
+  }
+});
 
-    active.forEach((plan) => list.appendChild(renderPlanCard(plan)));
-  } catch (err) {
-    loading.textContent = `Couldn't load your plans (${err.message}).`;
+export async function initDashboard(user) {
+  const now = new Date();
+  document.getElementById('today-date').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const hour = now.getHours();
+  const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greeting').innerHTML = `${hello}, <em>${esc((user.display_name || '').split(' ')[0])}.</em>`;
+  try {
+    plans = (await api.get('/plans/mine')).filter((p) => !p.is_abandoned);
+    render();
+    loadCoachMessages();
+  } catch (ex) {
+    errEl.textContent = errorText(ex.message);
   }
 }
-
-/**
- * Delegated click handler for check-in buttons, attached ONCE to the
- * stable #plans-list container rather than re-attached on every reload —
- * event delegation means newly-rendered cards are covered automatically
- * without ever stacking duplicate listeners.
- */
-function initCheckinDelegation(bloomScene) {
-  const list = document.getElementById('plans-list');
-  list.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-checkin]');
-    if (!btn) return;
-    const status = btn.dataset.checkin;
-    const planId = btn.dataset.planId;
-    btn.disabled = true;
-    try {
-      const result = await api.post(`/plans/${planId}/checkin`, { status });
-      if (result.reward_tier > 0 && bloomScene) bloomScene.trigger(result.reward_tier);
-      await loadPlans(bloomScene);
-    } catch (err) {
-      alert(`Couldn't save check-in: ${err.message}`);
-      btn.disabled = false;
-    }
-  });
-}
-
-
-function initBloomScene() {
-  const canvas = document.getElementById('bloom-canvas');
-  if (!canvas) return null;
-
-  const scene = new BloomScene(canvas);
-  scene.start();
-  window.addEventListener('pagehide', () => scene.destroy());
-  return scene;
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-  const user = await requireAuth();
-  if (!user) return;
-
-  const bloomScene = initBloomScene();
-
-  initCheckinDelegation(bloomScene);
-
-  await loadPlans(bloomScene);
-});

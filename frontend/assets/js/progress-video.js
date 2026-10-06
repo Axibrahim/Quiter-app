@@ -1,164 +1,103 @@
-import { api } from './modules/api-client.js';
+/**
+ * Optional 10-second video check-ins.
+ *  - Frequency Off hides the recorder completely (existing clips still show).
+ *  - Recording can be cancelled or stopped early at any time.
+ */
+import { api, errorText } from './modules/api-client.js';
 
-let mediaStream = null;
-let mediaRecorder = null;
-let recordedChunks = [];
-let recordedBlob = null;
-let countdownTimer = null;
+const $ = (id) => document.getElementById(id);
+let stream = null, recorder = null, chunks = [], blob = null, timer = null, cancelled = false;
 
-function setPanelState(state) {
-  document.getElementById('video-recorder-idle').style.display = state === 'idle' ? '' : 'none';
-  document.getElementById('video-recorder-active').style.display = state === 'active' ? '' : 'none';
-  document.getElementById('video-recorder-review').style.display = state === 'review' ? '' : 'none';
+function show(state) {
+  $('rec-idle').hidden = state !== 'idle';
+  $('rec-active').hidden = state !== 'active';
+  $('rec-review').hidden = state !== 'review';
 }
+function stopStream() { stream?.getTracks().forEach((t) => t.stop()); stream = null; }
+function clearTimer() { clearInterval(timer); timer = null; }
 
-function stopStream() {
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
-}
-
-async function startRecording() {
-  const errorEl = document.getElementById('video-error');
-  errorEl.textContent = '';
-
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  } catch (err) {
-    errorEl.textContent = "Couldn't access your camera — check your browser's camera permission for this site.";
+async function start() {
+  $('video-error').textContent = '';
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    $('video-error').textContent = "This browser can't record video. Try Chrome, Edge, Firefox or Safari 14.1+.";
     return;
   }
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); }
+  catch { $('video-error').textContent = "Couldn't reach your camera — allow camera access for this site and try again."; return; }
 
-  const preview = document.getElementById('video-preview');
-  preview.srcObject = mediaStream;
-  setPanelState('active');
-
-  recordedChunks = [];
-  const mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
-  mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
-
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
+  $('rec-preview').srcObject = stream;
+  show('active');
+  chunks = []; cancelled = false;
+  const mime = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
+  recorder = new MediaRecorder(stream, { mimeType: mime });
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    clearTimer(); stopStream();
+    if (cancelled) { show('idle'); return; }
+    blob = new Blob(chunks, { type: mime });
+    $('rec-review-video').src = URL.createObjectURL(blob);
+    show('review');
   };
+  recorder.start();
 
-  mediaRecorder.onstop = () => {
-    recordedBlob = new Blob(recordedChunks, { type: mimeType });
-    stopStream();
-
-    const reviewVideo = document.getElementById('video-review');
-    reviewVideo.src = URL.createObjectURL(recordedBlob);
-    setPanelState('review');
-  };
-
-  mediaRecorder.start();
-
-  let secondsLeft = 10;
-  const countdownEl = document.getElementById('recording-countdown');
-  countdownEl.textContent = `Recording — ${secondsLeft}s`;
-
-  countdownTimer = setInterval(() => {
-    secondsLeft -= 1;
-    countdownEl.textContent = `Recording — ${secondsLeft}s`;
-    if (secondsLeft <= 0) {
-      clearInterval(countdownTimer);
-      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    }
+  let left = 10;
+  $('rec-count').textContent = `Recording — ${left}s`;
+  timer = setInterval(() => {
+    left -= 1;
+    $('rec-count').textContent = `Recording — ${Math.max(left, 0)}s`;
+    if (left <= 0 && recorder.state !== 'inactive') recorder.stop();
   }, 1000);
 }
 
-function discardRecording() {
-  recordedBlob = null;
-  recordedChunks = [];
-  setPanelState('idle');
+function cancelRecording() { cancelled = true; if (recorder && recorder.state !== 'inactive') recorder.stop(); else { stopStream(); clearTimer(); show('idle'); } }
+function discard() { blob = null; chunks = []; show('idle'); }
+
+async function save(planId, refresh) {
+  if (!blob) return;
+  const btn = $('rec-save');
+  btn.disabled = true; $('video-error').textContent = '';
+  const form = new FormData();
+  form.append('video', blob, `checkin.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`);
+  try { await api.upload(`/plans/${planId}/videos`, form); discard(); await refresh(); }
+  catch (ex) { $('video-error').textContent = `Couldn't save your video. ${errorText(ex.message)}`; }
+  finally { btn.disabled = false; }
 }
 
-async function saveRecording(planId, onSaved) {
-  const errorEl = document.getElementById('video-error');
-  const saveBtn = document.getElementById('save-recording-btn');
-  if (!recordedBlob) return;
-
-  saveBtn.disabled = true;
-  errorEl.textContent = '';
-
-  const formData = new FormData();
-  const ext = recordedBlob.type.includes('mp4') ? 'mp4' : 'webm';
-  formData.append('video', recordedBlob, `checkin.${ext}`);
-
-  try {
-    const res = await fetch(`${api.baseUrl}/plans/${planId}/videos`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Quiter-Client': 'web' },
-      body: formData,
-    });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(result.error || 'upload_failed');
-
-    discardRecording();
-    if (onSaved) await onSaved();
-  } catch (err) {
-    errorEl.textContent = `Couldn't save your video: ${err.message}`;
-  } finally {
-    saveBtn.disabled = false;
-  }
+function renderGallery(videos, enabled) {
+  const g = $('gallery');
+  g.innerHTML = videos.map((v) => `<div class="gallery__item"><video src="${encodeURI(v.video_url)}" controls playsinline preload="metadata"></video><p>Day ${Number(v.day_number)}</p></div>`).join('');
+  $('video-state').textContent = enabled
+    ? (videos.length ? 'Your check-ins so far:' : 'No clips yet — record your first 10 seconds whenever you feel like it.')
+    : (videos.length ? 'Video check-ins are off. Your saved clips are below.' : 'Off. Turn on weekly or monthly if you’d like to record short progress clips. Totally optional.');
 }
 
-function renderGallery(videos) {
-  const gallery = document.getElementById('video-gallery');
-  gallery.innerHTML = '';
-
-  if (videos.length === 0) {
-    gallery.innerHTML = `
-      <div class="progress-video__empty">
-        <span class="progress-video__empty-icon"></span>
-        <p class="progress-video__empty-title">No check-ins recorded yet</p>
-        <p class="custom-plan__hint">Record your first 10-second video to start your progression reel.</p>
-      </div>
-    `;
-    return;
-  }
-
-  videos.forEach((v) => {
-    const item = document.createElement('div');
-    item.className = 'progress-video__gallery-item';
-    item.innerHTML = `
-      <video src="${v.video_url}" controls playsinline></video>
-      <p>Day ${v.day_number}</p>
-    `;
-    gallery.appendChild(item);
-  });
-}
-
-export async function initProgressVideo(planId, currentFrequency) {
-  const segButtons = document.querySelectorAll('#video-frequency-segmented .progress-video__seg-btn');
-  segButtons.forEach((btn) => {
-    btn.classList.toggle('is-active', btn.dataset.freq === (currentFrequency || ''));
-    btn.onclick = async () => {
-      segButtons.forEach((b) => b.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      try {
-        await api.patch(`/plans/${planId}/video-frequency`, { frequency: btn.dataset.freq || null });
-      } catch (err) {
-        alert(`Couldn't save your reminder preference: ${err.message}`);
-        btn.classList.remove('is-active');
-        segButtons.forEach((b) => b.classList.toggle('is-active', b.dataset.freq === (currentFrequency || '')));
-      }
-    };
-  });
-
-  const refreshGallery = async () => {
-    try {
-      const videos = await api.get(`/plans/${planId}/videos`);
-      renderGallery(videos);
-    } catch (err) {
-      document.getElementById('video-gallery').textContent = "Couldn't load your videos.";
-    }
+export function initVideoCheckins(planId, frequency) {
+  let freq = frequency || '';
+  let videos = [];
+  const radios = document.querySelectorAll('input[name=vfreq]');
+  const apply = () => {
+    radios.forEach((r) => { r.checked = r.value === freq; });
+    $('recorder').hidden = !freq;
+    if (!freq) cancelRecording();
+    renderGallery(videos, !!freq);
+  };
+  const refresh = async () => {
+    try { videos = await api.get(`/plans/${planId}/videos`); } catch { videos = []; $('video-error').textContent = "Couldn't load your videos."; }
+    apply();
   };
 
-  document.getElementById('start-recording-btn').onclick = startRecording;
-  document.getElementById('discard-recording-btn').onclick = discardRecording;
-  document.getElementById('save-recording-btn').onclick = () => saveRecording(planId, refreshGallery);
+  radios.forEach((r) => r.addEventListener('change', async () => {
+    const prev = freq;
+    freq = r.value; apply();
+    try { await api.patch(`/plans/${planId}/video-frequency`, { frequency: freq || null }); }
+    catch (ex) { freq = prev; apply(); $('video-error').textContent = errorText(ex.message); }
+  }));
 
-  await refreshGallery();
+  $('rec-start').onclick = start;
+  $('rec-stop').onclick = () => recorder && recorder.state !== 'inactive' && recorder.stop();
+  $('rec-cancel').onclick = cancelRecording;
+  $('rec-discard').onclick = discard;
+  $('rec-save').onclick = () => save(planId, refresh);
+  show('idle');
+  refresh();
 }

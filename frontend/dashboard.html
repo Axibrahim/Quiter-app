@@ -1,61 +1,33 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d7cff' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 3a9 9 0 0 1 0 18M3 12h18'/%3E%3C/svg%3E" />
-  <title>Your Dashboard — Quiter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<title>Dashboard — Quiter</title>
 </head>
-<body style="background: var(--bg);">
-
-  <canvas id="bloom-canvas" aria-hidden="true"></canvas>
-
-  <header class="nav wrap" style="position: sticky; top: 0;">
-    <div class="liquid-glass nav__pill">
-      <div class="nav__left">
-        <a href="index.html" class="nav__mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
-          Quiter
-        </a>
-        <nav class="nav__links">
-          <a href="index.html#plans">Plans</a>
-          <a href="index.html#about">About</a>
-        </nav>
-      </div>
-      <div class="nav__right" id="nav-auth-slot"></div>
-    </div>
-  </header>
-
-  <main class="wrap section" style="padding-top: var(--space-3);">
-    <div class="section__head">
+<body>
+<main class="page page--narrow">
+  <div class="wrap">
+    <div class="dash-head">
       <div>
-        <p class="eyebrow">Today</p>
-        <h1 class="h2">Your identity, one check-in at a time</h1>
+        <p class="eyebrow" id="today-date"></p>
+        <h1 class="h2" id="greeting">Today</h1>
       </div>
-        <a href="custom-plan.html" class="liquid-glass btn btn--glass">+ Build a custom plan</a>
-        <a href="custom-plan-athletics.html" class="liquid-glass btn btn--glass">+ Build an athletic plan</a>
-      </div>
-
-    <div id="plans-loading" class="lede">Loading your plans…</div>
-    <div id="plans-empty" style="display:none;">
-      <p class="lede">You haven't started a plan yet.</p>
-      <a href="index.html#plans" class="liquid-glass btn btn--solid" style="margin-top: var(--space-2);">Browse plans</a>
+      <a class="btn btn--solid" href="plans.html" id="new-plan">+ New plan</a>
     </div>
-
-    <div id="plans-list" style="display: flex; flex-direction: column; gap: var(--space-3);"></div>
-  </main>
-
-  <footer class="footer wrap">
-    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
-    <span>Privacy · Terms · Contact</span>
-  </footer>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="assets/js/mobile-nav.js"></script>
-  <script type="module" src="assets/js/dashboard.js"></script>
+    <p class="error" id="dash-error" role="alert"></p>
+    <div class="plans" id="plans" aria-live="polite"></div>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import { initDashboard } from './assets/js/dashboard.js';
+  initShell({ active: 'dashboard', auth: 'required' }).then((user) => user && initDashboard(user));
+</script>
 </body>
 </html>

@@ -1,74 +1,40 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d7cff' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 3a9 9 0 0 1 0 18M3 12h18'/%3E%3C/svg%3E" />
-  <title>Your Profile — Quiter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<title>Profile — Quiter</title>
 </head>
-<body style="background: var(--bg);">
-
-  <header class="nav wrap" style="position: sticky; top: 0;">
-    <div class="liquid-glass nav__pill">
-      <div class="nav__left">
-        <a href="index.html" class="nav__mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
-          Quiter
-        </a>
-        <nav class="nav__links">
-          <a href="dashboard.html">Dashboard</a>
-          <a href="index.html#about">About</a>
-        </nav>
+<body>
+<main class="page page--tiny">
+  <div class="wrap">
+    <div class="page-head"><p class="eyebrow">Account</p><h1 class="h2">Your <em>profile</em></h1></div>
+    <div class="group liquid-glass liquid-glass--panel">
+      <div class="warning" id="verify-banner" hidden style="justify-content:space-between;align-items:center">
+        <p>Your email isn't verified yet.</p>
+        <button class="btn btn--glass liquid-glass btn--sm" id="resend-verify-btn" type="button">Resend</button>
       </div>
-      <div class="nav__right" id="nav-auth-slot"></div>
-    </div>
-  </header>
-
-  <main class="wrap section" style="max-width: 560px; padding-top: var(--space-3);">
-    <p class="eyebrow">Account</p>
-    <h1 class="h2" style="margin-bottom: var(--space-4);">Your profile</h1>
-
-    <div class="liquid-glass liquid-glass--panel" style="border-radius: var(--radius-lg); padding: var(--space-4);">
-      <div id="verify-banner" style="display:none; margin-bottom: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: rgba(255,107,74,0.12); color: var(--accent-ember); font-size: 0.88rem; justify-content:space-between; align-items:center; gap: var(--space-2);">
-        <span>Your email isn't verified yet.</span>
-        <button class="liquid-glass btn btn--glass" id="resend-verify-btn" type="button" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">Resend</button>
-      </div>
-
-      <form id="profile-form">
-        <div class="modal__field">
-          <label for="profile-display-name">Display name</label>
-          <input type="text" id="profile-display-name" disabled style="opacity:0.6;" />
-          <p style="font-size:0.75rem; color: var(--ink-40); margin-top:0.3rem;">Display name changes aren't wired up yet — coming soon.</p>
-        </div>
-        <div class="modal__field">
-          <label for="profile-email">Email</label>
-          <input type="email" id="profile-email" autocomplete="email" required />
-        </div>
-        <div class="modal__field">
-          <label for="profile-new-password">New password <span style="color:var(--ink-40);">(leave blank to keep current)</span></label>
-          <input type="password" id="profile-new-password" placeholder="At least 10 characters" autocomplete="new-password" />
-        </div>
-        <div class="modal__field">
-          <label for="profile-current-password">Current password <span style="color:var(--accent-ember);">*required to save any change</span></label>
-          <input type="password" id="profile-current-password" autocomplete="current-password" required />
-        </div>
-        <p class="modal__error" id="profile-error"></p>
-        <p id="profile-success" style="color: var(--accent-teal); font-size: 0.85rem; margin-top: var(--space-1); min-height: 1.2em;"></p>
-        <button class="btn btn--solid modal__submit" type="submit">Save changes</button>
+      <form id="profile-form" novalidate>
+        <div class="field"><label for="p-name">Display name</label><input type="text" id="p-name" disabled><p class="field__hint">Name changes aren't available yet.</p></div>
+        <div class="field"><label for="p-email">Email</label><input type="email" id="p-email" autocomplete="email" required></div>
+        <div class="field"><label for="p-new">New password <span class="optional">leave blank to keep</span></label><input type="password" id="p-new" placeholder="At least 10 characters" autocomplete="new-password"></div>
+        <div class="field"><label for="p-current">Current password <span class="optional">required to save</span></label><input type="password" id="p-current" autocomplete="current-password" required></div>
+        <p class="error" id="p-error" role="alert"></p>
+        <p class="success" id="p-success" role="status"></p>
+        <button class="btn btn--solid" type="submit" style="width:100%">Save changes</button>
       </form>
     </div>
-  </main>
-
-  <footer class="footer wrap">
-    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
-    <span>Privacy · Terms · Contact</span>
-  </footer>
-
-  <script src="assets/js/mobile-nav.js"></script>
-  <script type="module" src="assets/js/profile.js"></script>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import { initProfile } from './assets/js/profile.js';
+  initShell({ auth: 'required' }).then((u) => u && initProfile(u));
+</script>
 </body>
 </html>

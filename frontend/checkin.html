@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Checking in — Quiter</title>
+</head>
+<body>
+<main class="page page--tiny page--center">
+  <div class="wrap">
+    <div class="result liquid-glass liquid-glass--panel" id="result" aria-live="polite">
+      <div class="result__icon result__icon--wait" id="icon"></div>
+      <h1 class="h3" id="title">Marking your day…</h1>
+      <p id="msg"></p>
+      <p class="mono" id="streak" hidden></p>
+      <a class="btn btn--solid" href="dashboard.html" id="cta" hidden>Open my dashboard</a>
+    </div>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import { api, errorText } from './assets/js/modules/api-client.js';
+  initShell({ auth: 'none' });
+
+  const $ = (id) => document.getElementById(id);
+  const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const CROSS = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const token = new URLSearchParams(location.search).get('token');
+  // Remove the token from the address bar / history once we've read it.
+  history.replaceState(null, '', location.pathname);
+
+  function show(kind, title, msg, streak) {
+    const icon = $('icon');
+    icon.className = 'result__icon' + (kind === 'error' ? ' result__icon--error' : '');
+    icon.innerHTML = kind === 'error' ? CROSS : CHECK;
+    $('title').textContent = title;
+    $('msg').textContent = msg;
+    if (streak) { $('streak').hidden = false; $('streak').textContent = streak; }
+    $('cta').hidden = false;
+  }
+
+  (async () => {
+    if (!token) { show('error', 'This link is incomplete', 'Open the button from your latest Quiter email, or check in from your dashboard.'); return; }
+    try {
+      const r = await api.post('/plans/email-checkin', { token });
+      const streak = r.current_streak > 0 ? `${r.current_streak}-day streak` : '';
+      if (r.is_completed) show('ok', 'Plan complete — you did it.', `Every day of “${r.title}” is done. Proud of you.`, streak);
+      else if (r.already_logged) show('ok', 'Already marked', `Today was already counted for “${r.title}”. Keep going.`, streak);
+      else show('ok', "You're on track.", `Day ${r.day_number} of ${r.total_days} marked for “${r.title}”.`, streak);
+    } catch (ex) {
+      const expired = ex.message === 'invalid_or_expired_token';
+      show('error', expired ? 'This link has expired' : "Couldn't mark your day",
+        expired ? 'Check-in links last about a day. You can still mark today from your dashboard.' : errorText(ex.message));
+    }
+  })();
+</script>
+</body>
+</html>

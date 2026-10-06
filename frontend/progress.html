@@ -1,127 +1,80 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Your Progress — Quiter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<title>Progress — Quiter</title>
 </head>
-<body style="background: var(--bg);">
-
-  <header class="nav wrap" style="position: sticky; top: 0;">
-    <div class="liquid-glass nav__pill">
-      <div class="nav__left">
-        <a href="index.html" class="nav__mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg>
-          Quiter
-        </a>
-        <nav class="nav__links">
-          <a href="dashboard.html">Dashboard</a>
-          <a href="plans.html">Plans</a>
-        </nav>
-      </div>
-      <div class="nav__right" id="nav-auth-slot"></div>
+<body>
+<main class="page page--narrow">
+  <div class="wrap">
+    <a class="back" href="dashboard.html">← Dashboard</a>
+    <div class="progress-head" style="margin-top:1rem">
+      <div><p class="eyebrow" id="p-kind"></p><h1 class="h2" id="p-title">Progress</h1></div>
+      <button class="btn btn--text btn--sm" type="button" id="exit-btn" hidden>Exit this plan</button>
     </div>
-  </header>
+    <p class="error" id="p-error" role="alert"></p>
 
-  <main class="wrap progress-page">
-    <a href="dashboard.html" class="custom-plan-page__back">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-      Back to dashboard
-    </a>
-
-    <p id="progress-loading" class="lede">Loading your progress…</p>
-    <p id="progress-error" class="modal__error"></p>
-
-    <div id="progress-content" style="display: none;">
-      <div class="progress-page__header">
-        <div>
-          <p class="progress-page__eyebrow" id="progress-eyebrow"></p>
-          <h1 class="h2" id="progress-title"></h1>
-        </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn--solid" id="progress-checkin-btn" type="button">Check in today</button>
-          <button class="liquid-glass btn btn--glass" id="progress-exit-btn" type="button">Exit this plan</button>
-        </div>
-      </div>
-
-      <div class="progress-page__stats">
-        <div class="liquid-glass liquid-glass--panel progress-stat">
-          <p class="progress-stat__label">Current streak</p>
-          <p class="progress-stat__value" id="stat-current-streak" style="color: var(--accent-teal);"></p>
-        </div>
-        <div class="liquid-glass liquid-glass--panel progress-stat">
-          <p class="progress-stat__label">Longest streak</p>
-          <p class="progress-stat__value" id="stat-longest-streak" style="color: var(--accent-violet);"></p>
-        </div>
-        <div class="liquid-glass liquid-glass--panel progress-stat">
-          <p class="progress-stat__label">Plan completion</p>
-          <p class="progress-stat__value" id="stat-completion" style="color: #f8bf40;"></p>
-        </div>
-      </div>
-
-      <div class="progress-page__warning" id="progress-warning" style="display: none;">
-        <span>●</span>
-        <p id="progress-warning-text"></p>
-      </div>
-
-      <div class="liquid-glass liquid-glass--panel progress-page__video-panel">
-        <div class="progress-video__header">
-          <p class="progress-stat__label">Progress videos</p>
-          <div class="progress-video__segmented" id="video-frequency-segmented" role="group" aria-label="Video reminder frequency">
-            <button type="button" class="progress-video__seg-btn is-active" data-freq="">Off</button>
-            <button type="button" class="progress-video__seg-btn" data-freq="weekly">Weekly</button>
-            <button type="button" class="progress-video__seg-btn" data-freq="monthly">Monthly</button>
-          </div>
-        </div>
-
-        <div id="video-recorder-idle">
-          <button class="btn btn--solid progress-video__record-btn" id="start-recording-btn" type="button">
-            <span class="progress-video__rec-dot"></span>
-            Record a 10-second check-in
-          </button>
-        </div>
-
-        <div id="video-recorder-active" style="display: none;">
-          <video id="video-preview" autoplay muted playsinline></video>
-          <div class="progress-video__countdown" id="recording-countdown"></div>
-        </div>
-
-        <div id="video-recorder-review" style="display: none;">
-          <video id="video-review" controls playsinline></video>
-          <div class="progress-video__review-actions">
-            <button class="btn btn--solid" id="save-recording-btn" type="button">Save this check-in</button>
-            <button class="liquid-glass btn btn--glass" id="discard-recording-btn" type="button">Discard &amp; retry</button>
-          </div>
-        </div>
-
-        <p class="modal__error" id="video-error"></p>
-
-        <div class="progress-video__gallery" id="video-gallery"></div>
-      </div>
-
-      <div class="liquid-glass liquid-glass--panel progress-page__heatmap-panel">
-        <p class="progress-stat__label">Last 30 days</p>
-        <div class="progress-heatmap" id="progress-heatmap"></div>
-        <div class="progress-heatmap__legend">
-          <span><i style="background: var(--accent-teal);"></i>Completed</span>
-          <span><i style="background: #f8bf40;"></i>Partial</span>
-          <span><i style="background: rgba(255,255,255,0.15);"></i>Missed / none</span>
-          <span><i style="background: var(--accent-ember);"></i>Relapsed</span>
-        </div>
-      </div>
+    <div class="stats">
+      <div class="stat liquid-glass liquid-glass--panel"><p class="stat__label">Day</p><p class="stat__value" id="s-day">–</p></div>
+      <div class="stat liquid-glass liquid-glass--panel"><p class="stat__label">Streak</p><p class="stat__value" id="s-streak">–</p></div>
+      <div class="stat liquid-glass liquid-glass--panel"><p class="stat__label">Best</p><p class="stat__value" id="s-best">–</p></div>
     </div>
-  </main>
 
-  <footer class="footer wrap">
-    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
-    <span>Privacy · Terms · Contact</span>
-  </footer>
+    <div class="warning" id="quit-warning" hidden><span aria-hidden="true">⚠</span><p id="quit-warning-text"></p></div>
 
-  <script src="assets/js/mobile-nav.js"></script>
-  <script type="module" src="assets/js/progress.js"></script>
+    <section class="panel liquid-glass liquid-glass--panel">
+      <h2 class="panel__title">Last 30 days</h2>
+      <div class="heatmap" id="heatmap" role="img" aria-label="30-day check-in calendar"></div>
+      <div class="legend"><span><i style="background:var(--accent-teal)"></i>Done</span><span><i style="background:var(--accent-gold)"></i>Partial</span><span><i style="background:var(--accent-ember)"></i>Missed</span><span><i style="background:rgba(255,255,255,.12)"></i>No entry</span></div>
+    </section>
+
+    <section class="panel liquid-glass liquid-glass--panel" id="coach-panel" hidden>
+      <h2 class="panel__title">Coach notes</h2>
+      <ul class="diagnosis" id="diagnosis"></ul>
+    </section>
+
+    <section class="panel liquid-glass liquid-glass--panel" id="weekday-panel" hidden>
+      <h2 class="panel__title">Your strongest days</h2>
+      <div class="weekdays" id="weekdays"></div>
+    </section>
+
+    <section class="panel liquid-glass liquid-glass--panel" id="ex-panel" hidden>
+      <h2 class="panel__title" id="ex-title">Your numbers</h2>
+      <div class="ex-cards" id="ex-cards"></div>
+    </section>
+
+    <section class="panel liquid-glass liquid-glass--panel" id="video">
+      <div class="panel__head">
+        <h2 class="panel__title">10-second video check-ins <span class="optional">Optional</span></h2>
+        <div class="seg" role="radiogroup" aria-label="Video check-in frequency" id="video-seg">
+          <label><input type="radio" name="vfreq" value="" checked><span>Off</span></label>
+          <label><input type="radio" name="vfreq" value="weekly"><span>Weekly</span></label>
+          <label><input type="radio" name="vfreq" value="monthly"><span>Monthly</span></label>
+        </div>
+      </div>
+      <p class="video-state" id="video-state"></p>
+      <div class="recorder" id="recorder" hidden>
+        <div id="rec-idle"><button class="btn btn--glass liquid-glass rec-btn" type="button" id="rec-start"><span class="rec-dot"></span>Record 10 seconds</button></div>
+        <div id="rec-active" hidden><video id="rec-preview" autoplay muted playsinline></video><p class="countdown" id="rec-count"></p>
+          <div class="recorder__actions"><button class="btn btn--glass liquid-glass btn--sm" type="button" id="rec-stop">Stop now</button><button class="btn btn--text btn--sm" type="button" id="rec-cancel">Cancel</button></div></div>
+        <div id="rec-review" hidden><video id="rec-review-video" controls playsinline></video>
+          <div class="recorder__actions"><button class="btn btn--solid btn--sm" type="button" id="rec-save">Save check-in</button><button class="btn btn--text btn--sm" type="button" id="rec-discard">Discard</button></div></div>
+      </div>
+      <p class="error" id="video-error" role="alert"></p>
+      <div class="gallery" id="gallery"></div>
+    </section>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import { initProgress } from './assets/js/progress.js';
+  initShell({ active: 'dashboard', auth: 'required' }).then((u) => u && initProgress());
+</script>
 </body>
 </html>

@@ -1,19 +1,31 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d7cff' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 3a9 9 0 0 1 0 18M3 12h18'/%3E%3C/svg%3E" />
-  <title>Verify your email — Quiter</title>
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<meta name="robots" content="noindex">
+<title>Verify email — Quiter</title>
 </head>
-<body style="background: var(--bg); display:flex; align-items:center; justify-content:center; min-height:100vh;">
-  <div class="liquid-glass liquid-glass--panel" style="border-radius: var(--radius-lg); padding: var(--space-4); max-width: 420px; text-align:center;">
-    <h1 class="h3" id="verify-title">Verifying your email…</h1>
-    <p id="verify-body" style="margin-top: var(--space-2);">One moment.</p>
-    <a href="index.html" class="liquid-glass btn btn--glass" style="margin-top: var(--space-3); display:none;" id="verify-home-link">Back to Quiter</a>
+<body>
+<main class="page page--tiny page--center">
+  <div class="wrap">
+    <div class="result liquid-glass liquid-glass--panel" aria-live="polite">
+      <div class="result__icon result__icon--wait" id="v-icon"></div>
+      <h1 class="h3" id="verify-title">Verifying your email…</h1>
+      <p id="verify-body">One moment.</p>
+      <a href="index.html" class="btn btn--solid" id="verify-home" hidden>Back to Quiter</a>
+    </div>
   </div>
-  <script type="module" src="assets/js/verify.js"></script>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  import './assets/js/verify.js';
+  initShell({ auth: 'none' });
+</script>
 </body>
 </html>

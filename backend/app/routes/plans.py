@@ -10,7 +10,7 @@ the fact").
 """
 import math
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, request, jsonify, g
@@ -24,6 +24,8 @@ from app.data.exercise_catalog import (
     CATALOG, METRICS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
 )
 from app.utils.analytics import build_analytics
+from app.utils.coach_ai import get_or_create_coach_message, get_existing_coach_message
+from app.security.checkin_tokens import read_checkin_token
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
 from app.security.limiter import limiter, HABIT_LOG_RATE_LIMIT
@@ -36,6 +38,7 @@ SUPPORT_STYLES = {"gentle", "focused", "reflective"}
 MAX_ACTIVE_PLANS = 3
 AUTO_QUIT_DAYS = 15
 VIDEO_FREQUENCIES = {"weekly", "monthly", None}
+COACH_MESSAGE_RATE_LIMIT = "30 per hour"
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +65,21 @@ def _tracked_exercises(user_plan):
     return items if isinstance(items, list) else []
 
 
+def _today_in(tz_name):
+    """Today's date in a named timezone (falls back to UTC on a bad name)."""
+    try:
+        return datetime.now(ZoneInfo(tz_name or "UTC")).date()
+    except Exception:
+        return datetime.utcnow().date()
+
+
+def _local_today(user_plan):
+    """'Today' in the plan's own timezone. The server runs in UTC, so using
+    date.today() would put users east of UTC (e.g. Egypt) on yesterday for the
+    first hours of their day — and make the dashboard disagree with the email."""
+    return _today_in(user_plan.reminder_timezone)
+
+
 def _current_day_number(user_plan, today):
     return max(1, min((today - user_plan.start_date).days + 1, user_plan.template.length_days))
 
@@ -72,7 +90,7 @@ def _read_custom_settings(payload):
 
     Returns:
         ((length_days, identity_statement, support_style,
-          reminder_times, reminder_timezone), None)
+          reminder_times, reminder_timezone, video_checkin_frequency), None)
         or
         (None, error_code)
     """
@@ -117,8 +135,13 @@ def _read_custom_settings(payload):
     except Exception:
         return None, "invalid_timezone"
 
+    # Optional 10-second video check-ins. Off (None) unless the user opts in.
+    video_frequency = payload.get("video_checkin_frequency") or None
+    if video_frequency not in VIDEO_FREQUENCIES:
+        return None, "invalid_video_frequency"
+
     return (
-        (length_days, identity_statement, support_style, normalized_times, reminder_timezone),
+        (length_days, identity_statement, support_style, normalized_times, reminder_timezone, video_frequency),
         None,
     )
 
@@ -229,7 +252,22 @@ def _record_checkin(user_plan, status, note, today):
     ))
 
     if status == LogStatus.COMPLETED.value:
-        user_plan.current_streak += 1
+        # A streak only continues if the previous completed day was YESTERDAY.
+        # Any gap (even without an explicit "missed" log) restarts it at 1.
+        previous = (
+            DailyLog.query
+            .filter(
+                DailyLog.user_plan_id == user_plan.id,
+                DailyLog.status == LogStatus.COMPLETED,
+                DailyLog.log_date < today,
+            )
+            .order_by(DailyLog.log_date.desc())
+            .first()
+        )
+        if previous and (today - previous.log_date).days == 1:
+            user_plan.current_streak += 1
+        else:
+            user_plan.current_streak = 1
         user_plan.longest_streak = max(user_plan.longest_streak, user_plan.current_streak)
         if day_number >= user_plan.template.length_days:
             user_plan.is_completed = True
@@ -269,15 +307,22 @@ def _load_plan(user_plan_id):
 def my_plans():
     """List the current user's plans for the dashboard — each with today's
     micro-goal pre-computed so the dashboard needs no per-plan round trip."""
-    today = date.today()
     user_plans = UserPlan.query.filter_by(user_id=g.current_user.id).order_by(UserPlan.created_at.desc()).all()
 
     out = []
     for up in user_plans:
+        today = _local_today(up)
         day_number = _current_day_number(up, today)
         plan_day = PlanDay.query.filter_by(template_id=up.template_id, day_number=day_number).first()
         already_logged = DailyLog.query.filter_by(user_plan_id=up.id, log_date=today).first()
         meta = up.athletic_metadata or {}
+        today_values = {}
+        if meta:
+            today_values = {
+                row.exercise_key: row.value
+                for row in ExerciseLog.query.filter_by(user_plan_id=up.id, log_date=today).all()
+            }
+        existing_message = get_existing_coach_message(up.id, today)
         out.append({
             "user_plan_id": up.id,
             "template_id": up.template_id,
@@ -285,6 +330,10 @@ def my_plans():
             "category": up.template.category,
             "sport_label": meta.get("sport_label"),
             "tracked_exercise_count": len(_tracked_exercises(up)),
+            "tracked_exercises": _tracked_exercises(up),
+            "today_values": today_values,
+            "video_checkin_frequency": up.video_checkin_frequency,
+            "coach_message": existing_message.body if existing_message else None,
             "photo_url": up.template.photo_url,
             "title": up.template.title,
             "direction": up.template.direction.value,
@@ -400,7 +449,7 @@ def get_today(user_plan_id):
     if err:
         return err
 
-    today = date.today()
+    today = _local_today(user_plan)
     day_number = _current_day_number(user_plan, today)
     plan_day = PlanDay.query.filter_by(template_id=user_plan.template_id, day_number=day_number).first()
     already_logged = DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first()
@@ -432,7 +481,7 @@ def checkin(user_plan_id):
     if status_raw not in [s.value for s in LogStatus]:
         return jsonify({"error": "invalid_status"}), 400
 
-    result, error = _record_checkin(user_plan, status_raw, payload.get("note"), date.today())
+    result, error = _record_checkin(user_plan, status_raw, payload.get("note"), _local_today(user_plan))
     if error:
         return jsonify({"error": error[0]}), error[1]
 
@@ -485,7 +534,7 @@ def log_exercises(user_plan_id):
             return jsonify({"error": "invalid_value"}), 400
         cleaned[key] = round(float(value), 2)
 
-    today = date.today()
+    today = _local_today(user_plan)
     existing = {
         row.exercise_key: row
         for row in ExerciseLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).all()
@@ -531,7 +580,7 @@ def get_progress(user_plan_id):
     if err:
         return err
 
-    today = date.today()
+    today = _local_today(user_plan)
     day_number = _current_day_number(user_plan, today)
     completion_pct = round((day_number / user_plan.template.length_days) * 100)
 
@@ -617,7 +666,7 @@ def get_analytics(user_plan_id):
 
     data = build_analytics(
         start=user_plan.start_date,
-        today=date.today(),
+        today=_local_today(user_plan),
         length_days=user_plan.template.length_days,
         status_by_date=status_by_date,
         exercises=tracked,
@@ -665,12 +714,12 @@ def _daily_action(support_style, target):
 @login_required
 def create_custom_plan():
     """
-    Create a flexible user-owned plan for ANY goal.
+    Create a personal coaching plan for ANY goal.
 
     The generated PlanTemplate stays hidden from the public catalog, while
-    UserPlan stores the user's goal, support style, reminders and timezone.
-    "direction" is optional now (the app is a goal coach, not only
-    break/build) and defaults to "build".
+    UserPlan stores the user's goal, support style, reminders, timezone and
+    the optional video check-in frequency. "direction" is legacy and optional
+    (defaults to "build") — the app is a personal coach now, not break/build.
     """
     payload = request.get_json(silent=True) or {}
 
@@ -692,15 +741,10 @@ def create_custom_plan():
     if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
         return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
-    length_days, identity_statement, support_style, reminder_times, reminder_timezone = settings
+    length_days, identity_statement, support_style, reminder_times, reminder_timezone, video_frequency = settings
 
     if not identity_statement:
-        identity_statement = (
-            "I am someone who is "
-            + ("breaking free from " if direction == "break" else "working toward ")
-            + goal_text
-            + "."
-        )
+        identity_statement = f"I am someone who follows through on: {goal_text}."[:160]
 
     template = PlanTemplate(
         slug=f"custom-{gen_uuid()[:8]}",
@@ -726,7 +770,9 @@ def create_custom_plan():
         reminder_times=reminder_times,
         reminder_timezone=reminder_timezone,
         reminders_enabled=bool(reminder_times),
-        start_date=date.today(),
+        video_checkin_frequency=video_frequency,
+        start_date=_today_in(reminder_timezone),
+        last_checkin_date=_today_in(reminder_timezone),
     )
     db.session.add(user_plan)
     db.session.commit()
@@ -742,6 +788,7 @@ def create_custom_plan():
         "reminder_times": reminder_times,
         "reminder_timezone": reminder_timezone,
         "reminders_enabled": bool(reminder_times),
+        "video_checkin_frequency": video_frequency,
         "start_date": user_plan.start_date.isoformat(),
     }), 201
 
@@ -767,7 +814,7 @@ def create_athletic_plan():
     if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
         return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
-    length_days, identity_statement, support_style, reminder_times, reminder_timezone = settings
+    length_days, identity_statement, support_style, reminder_times, reminder_timezone, video_frequency = settings
 
     sport_label = athletic_fields["sport_label"]
     progression_goal = athletic_fields["progression_goal"]
@@ -807,7 +854,9 @@ def create_athletic_plan():
         reminder_times=reminder_times,
         reminder_timezone=reminder_timezone,
         reminders_enabled=bool(reminder_times),
-        start_date=date.today(),
+        video_checkin_frequency=video_frequency,
+        start_date=_today_in(reminder_timezone),
+        last_checkin_date=_today_in(reminder_timezone),
         athletic_metadata=athletic_fields,
     )
     db.session.add(user_plan)
@@ -843,7 +892,7 @@ def upload_progress_video_route(user_plan_id):
     except SupabaseStorageError as e:
         return jsonify({"error": str(e)}), 400
 
-    day_number = _current_day_number(user_plan, date.today())
+    day_number = _current_day_number(user_plan, _local_today(user_plan))
 
     video = ProgressVideo(
         user_id=g.current_user.id,
@@ -893,3 +942,78 @@ def set_video_frequency(user_plan_id):
     user_plan.video_checkin_frequency = frequency
     db.session.commit()
     return jsonify({"video_checkin_frequency": frequency}), 200
+
+
+# ---------------------------------------------------------------------------
+# Coach message (dashboard) + one-tap email check-in
+# ---------------------------------------------------------------------------
+
+@plans_bp.route("/<user_plan_id>/coach-message", methods=["GET"])
+@limiter.limit(COACH_MESSAGE_RATE_LIMIT)
+@login_required
+def get_coach_message(user_plan_id):
+    """Today's personal coach message for this plan. Generated on first call of
+    the day (AI when AI_API_KEY is set, templates otherwise) and stored, so the
+    reminder email and the dashboard always show the same text."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
+    if user_plan.is_completed or user_plan.is_abandoned:
+        return jsonify({"message": None}), 200
+
+    today = _local_today(user_plan)
+    row = get_or_create_coach_message(user_plan, today)
+    return jsonify({"message": row.body, "source": row.source, "date": today.isoformat()}), 200
+
+
+@plans_bp.route("/email-checkin", methods=["POST"])
+@limiter.limit(HABIT_LOG_RATE_LIMIT)
+def email_checkin():
+    """The 'Yes, I'm on track' button in the reminder email.
+
+    Deliberately POST (not GET): mail scanners and link-preview bots fetch
+    links with GET, and that must never mark a day complete. The frontend page
+    (checkin.html) reads the signed token from the URL and POSTs it here.
+    No session needed — the signed token IS the authorization, and it can only
+    complete this one plan for this one day.
+    """
+    payload = request.get_json(silent=True) or {}
+    parsed = read_checkin_token(payload.get("token"))
+    if parsed is None:
+        return jsonify({"error": "invalid_or_expired_token"}), 400
+    user_plan_id, token_date = parsed
+
+    user_plan = db.session.get(UserPlan, user_plan_id)
+    if user_plan is None or not user_plan.user.is_active:
+        return jsonify({"error": "plan_not_found"}), 404
+
+    today = _local_today(user_plan)
+    if token_date > today or (today - token_date).days > 1:
+        return jsonify({"error": "invalid_or_expired_token"}), 400
+
+    base = {
+        "title": user_plan.goal_text or user_plan.template.title,
+        "day_number": _current_day_number(user_plan, token_date),
+        "total_days": user_plan.template.length_days,
+    }
+
+    if DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=token_date).first():
+        return jsonify({**base, "already_logged": True,
+                        "current_streak": user_plan.current_streak,
+                        "is_completed": user_plan.is_completed}), 200
+
+    result, error = _record_checkin(user_plan, LogStatus.COMPLETED.value, None, token_date)
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({**base, "already_logged": True,
+                        "current_streak": user_plan.current_streak,
+                        "is_completed": user_plan.is_completed}), 200
+
+    return jsonify({**base, "already_logged": False,
+                    "current_streak": result["current_streak"],
+                    "is_completed": result["is_completed"]}), 200

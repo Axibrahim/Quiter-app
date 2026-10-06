@@ -1,140 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d7cff' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 3a9 9 0 0 1 0 18M3 12h18'/%3E%3C/svg%3E" />
-  <title>Plans — Quiter</title>
-  <meta name="description" content="Structured 7, 15, and 30-day identity plans to break bad habits and build good ones — with anonymous squads to keep you honest." />
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<title>Start a plan — Quiter</title>
 </head>
 <body>
-
-  <!-- ============================= NETFLIX-STYLE PLAN SWIPER HERO ============================= -->
-  <section class="plans-hero-swiper">
-
-    <header class="nav">
-      <div class="liquid-glass nav__pill">
-        <div class="nav__left">
-          <a href="index.html" class="nav__mark">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width: 22px; height: 22px; flex-shrink: 0;">
-              <circle cx="12" cy="12" r="9"/>
-              <path d="M12 3a9 9 0 0 1 0 18M3 12h18"/>
-            </svg>
-            <span>Quiter</span>
-          </a>
-          <nav class="nav__links" style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="plans.html" class="is-active" style="color: var(--ink, #fff); font-weight: 500;">Plans</a>
-            <a href="index.html#about">About</a>
-            <a href="dashboard.html" id="nav-dashboard-link">Dashboard</a>
-          </nav>
-        </div>
-        <div class="nav__right" id="nav-auth-slot">
-          <button class="btn btn--text" id="signup-trigger" type="button">Sign Up</button>
-        </div>
-      </div>
-    </header>
-
-    <div class="plans-swiper" id="plans-swiper">
-      <div class="plans-swiper__track" id="plans-swiper-track">
-        <p style="color: var(--ink-40); padding: 2rem;">Loading previews…</p>
-      </div>
+<main class="page">
+  <div class="wrap">
+    <div class="page-head" data-reveal>
+      <p class="eyebrow">New plan</p>
+      <h1 class="h2">How do you want to <em>train?</em></h1>
+      <p class="lede">Choose the kind of coaching that fits. You can run up to three plans at once.</p>
     </div>
-
-    <button class="plans-swiper__arrow plans-swiper__arrow--prev" id="swiper-prev" type="button" aria-label="Previous plan">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <button class="plans-swiper__arrow plans-swiper__arrow--next" id="swiper-next" type="button" aria-label="Next plan">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-
-    <div class="plans-swiper__dots" id="plans-swiper-dots"></div>
-  </section>
-
-  <main class="wrap">
-
-    <!-- ============================= FILTERS ============================= -->
-    <section class="plans-filters" style="display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin: var(--space-5, 4rem) 0 var(--space-4, 2rem);" data-reveal>
-      <button class="liquid-glass btn btn--glass filter-btn is-active" data-filter="all" type="button">All plans</button>
-      <button class="liquid-glass btn btn--glass filter-btn" data-filter="direction:break" type="button">Break a habit</button>
-      <button class="liquid-glass btn btn--glass filter-btn" data-filter="direction:build" type="button">Build a habit</button>
-      <button class="liquid-glass btn btn--glass filter-btn" data-filter="length:7" type="button">7 days</button>
-      <button class="liquid-glass btn btn--glass filter-btn" data-filter="length:15" type="button">15 days</button>
-      <button class="liquid-glass btn btn--glass filter-btn" data-filter="length:30" type="button">30 days</button>
-    </section>
-
-    <!-- ============================= CATALOG ============================= -->
-    <section class="plans-catalog" style="padding-bottom: var(--space-6, 4rem);">
-      <p id="plans-loading" style="text-align: center; color: var(--ink-60, rgba(255,255,255,0.6));">Loading plans…</p>
-      <div id="catalog-plan-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;"></div>
-    </section>
-
-    <!-- ============================= MOTIVATION ============================= -->
-    <section class="motivation wrap" data-reveal>
-      <p class="eyebrow" data-reveal>Why it works</p>
-      <h2 class="h2" data-reveal>You don't need more willpower. <em class="serif-italic">You need a plan that survives a bad day.</em></h2>
-      <div class="motivation-grid">
-        <div class="liquid-glass liquid-glass--panel motivation-card" data-reveal>
-          <p class="motivation-card__quote">"The plan doesn't end the moment you slip. It's built to survive one."</p>
-        </div>
-        <div class="liquid-glass liquid-glass--panel motivation-card" data-reveal>
-          <p class="motivation-card__quote">"One micro-goal a day is small enough to actually do — and that's the whole point."</p>
-        </div>
-        <div class="liquid-glass liquid-glass--panel motivation-card" data-reveal>
-          <p class="motivation-card__quote">"You're not quitting something. You're becoming someone."</p>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <footer class="footer wrap">
-    <span>© 2026 Quiter. Built to be quit — one habit at a time.</span>
-    <span>Privacy · Terms · Contact</span>
-  </footer>
-
-  <!-- ============================= AUTH MODAL ============================= -->
-  <div class="modal-overlay" id="auth-modal-overlay">
-    <div class="liquid-glass liquid-glass--panel modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-      <button class="icon-btn modal__close" id="auth-modal-close" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <div class="modal__tabs">
-        <button class="modal__tab is-active" id="tab-login" type="button">Login</button>
-        <button class="modal__tab" id="tab-signup" type="button">Sign Up</button>
-      </div>
-      <h3 class="h3" id="auth-modal-title" style="margin-bottom: var(--space-2);">Welcome back</h3>
-
-      <form id="auth-form">
-        <div class="modal__field" id="field-display-name" style="display: none;">
-          <label for="auth-display-name">Display name</label>
-          <input type="text" id="auth-display-name" placeholder="How your squad sees you" autocomplete="nickname" />
-        </div>
-        <div class="modal__field">
-          <label for="auth-email">Email</label>
-          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" required />
-        </div>
-        <div class="modal__field">
-          <label for="auth-password">Password</label>
-          <input type="password" id="auth-password" placeholder="At least 10 characters" autocomplete="current-password" required />
-          <a href="#" id="auth-forgot-link" style="display:block; text-align:right; font-size:0.8rem; color:var(--ink-40); margin-top:0.4rem;">Forgot password?</a>
-        </div>
-        <p class="modal__error" id="auth-error"></p>
-        <button class="btn btn--solid modal__submit" type="submit" id="auth-submit">Login</button>
-      </form>
+    <div class="grid-2">
+      <a class="choice liquid-glass liquid-glass--panel" href="custom-plan-athletics.html" data-requires-auth data-reveal>
+        <span class="choice__tag">Athlete plan</span>
+        <span class="choice__title">Train with numbers.</span>
+        <ul class="choice__list"><li>Pick your sport and the exercises you want to track</li><li>Set a target to progress toward</li><li>Daily logging, trends and coach diagnosis</li></ul>
+        <span class="choice__cta">Build my athlete plan →</span>
+      </a>
+      <a class="choice liquid-glass liquid-glass--panel" href="custom-plan.html" data-requires-auth data-reveal>
+        <span class="choice__tag">Personal plan</span>
+        <span class="choice__title">Your own custom plan.</span>
+        <ul class="choice__list"><li>Any goal, in your own words</li><li>Your pace, your coaching style</li><li>Daily micro-goals and a personal coach message</li></ul>
+        <span class="choice__cta">Build my personal plan →</span>
+      </a>
     </div>
   </div>
-
-  <!-- ================= Third-party libraries (pinned CDN) ================= -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-  <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
-
-  <script src="assets/js/mobile-nav.js"></script>
-  <script type="module" src="assets/js/plans.js"></script>
+</main>
+<script type="module">
+  import { initShell } from './assets/js/modules/shell.js';
+  initShell({ active: 'plans' });
+</script>
 </body>
 </html>

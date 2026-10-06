@@ -278,3 +278,44 @@ class ExerciseLog(db.Model):
         CheckConstraint("value >= 0 AND value <= 100000", name="ck_exercise_value_range"),
         Index("ix_exercise_logs_plan_exercise_date", "user_plan_id", "exercise_key", "log_date"),
     )
+
+
+class ReminderDelivery(db.Model):
+    """One row per reminder email that has been CLAIMED by the worker.
+
+    The unique constraint is the lock: if two worker instances race for the
+    same (plan, local date, HH:MM) reminder, Postgres lets exactly one insert
+    through and the other skips — so nobody ever gets the same email twice.
+    """
+    __tablename__ = "reminder_deliveries"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    reminder_date = Column(Date, nullable=False)            # the user's LOCAL date
+    reminder_time = Column(String(5), nullable=False)       # "HH:MM"
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_plan_id", "reminder_date", "reminder_time", name="uq_reminder_once"),
+    )
+
+
+class CoachMessage(db.Model):
+    """The motivational message generated for one plan on one local day.
+
+    Generated once (AI when configured, template fallback otherwise), then
+    reused by the reminder email AND the dashboard so both show the same
+    words and we never pay for the same message twice.
+    """
+    __tablename__ = "coach_messages"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_date = Column(Date, nullable=False)             # the user's LOCAL date
+    body = Column(String(400), nullable=False)
+    source = Column(String(16), nullable=False, default="fallback")   # "ai" | "fallback"
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_plan_id", "message_date", name="uq_one_coach_message_per_day"),
+    )
