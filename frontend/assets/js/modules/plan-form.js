@@ -64,22 +64,25 @@ const html = `
   </div>
 </section>`;
 
-export function mountCommonFields(host) {
+export function mountCommonFields(host, { pace = true } = {}) {
   host.innerHTML = html;
+  if (!pace) host.querySelector('#len').closest('section').remove();   // catalog plans keep their own length
   const $ = (s) => host.querySelector(s);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   $('#tz-hint').textContent = `Times use your timezone: ${tz}`;
 
   const len = $('#len'), out = $('#len-out');
-  const syncLen = () => {
-    out.textContent = `${len.value} days`;
-    const pct = ((len.value - len.min) / (len.max - len.min)) * 100;
-    len.style.setProperty('--range-progress', `${pct}%`);
-    host.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('is-active', b.dataset.d === len.value));
-  };
-  len.addEventListener('input', syncLen);
-  $('#presets').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { len.value = b.dataset.d; syncLen(); } });
-  syncLen();
+  if (len) {
+    const syncLen = () => {
+      out.textContent = `${len.value} days`;
+      const pct = ((len.value - len.min) / (len.max - len.min)) * 100;
+      len.style.setProperty('--range-progress', `${pct}%`);
+      host.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('is-active', b.dataset.d === len.value));
+    };
+    len.addEventListener('input', syncLen);
+    $('#presets').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { len.value = b.dataset.d; syncLen(); } });
+    syncLen();
+  }
 
   const rows = [...host.querySelectorAll('[data-row]')];
   const syncRow = (r) => r.classList.toggle('is-selected', r.querySelector('[data-on]').checked);
@@ -89,7 +92,7 @@ export function mountCommonFields(host) {
     read() {
       const times = rows.filter((r) => r.querySelector('[data-on]').checked).map((r) => r.querySelector('[data-time]').value).filter(Boolean);
       return {
-        length_days: Number(len.value),
+        ...(len ? { length_days: Number(len.value) } : {}),
         identity_statement: $('#identity').value.trim(),
         support_style: host.querySelector('input[name=style]:checked').value,
         reminder_times: [...new Set(times)],

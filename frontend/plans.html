@@ -33,11 +33,20 @@
         <span class="choice__cta">Build my personal plan →</span>
       </a>
     </div>
+
+    <section class="section" id="ready-made" hidden>
+      <div class="section__head" data-reveal>
+        <p class="eyebrow">Ready-made plans</p>
+        <h2 class="h2">Or start from a <em>proven program.</em></h2>
+      </div>
+      <div class="tpl-grid" id="tpl-grid"></div>
+    </section>
   </div>
 </main>
 <script type="module">
   import { initShell } from './assets/js/modules/shell.js';
-  initShell({ active: 'plans' });
+  import { initPlans } from './assets/js/plans.js';
+  initShell({ active: 'plans' }).then((user) => initPlans(user));
 </script>
 </body>
 </html>

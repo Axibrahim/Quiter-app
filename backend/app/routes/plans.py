@@ -432,7 +432,25 @@ def adopt_plan():
     if _active_plan_count(g.current_user.id) >= MAX_ACTIVE_PLANS:
         return jsonify({"error": "max_plans_reached", "max": MAX_ACTIVE_PLANS}), 409
 
-    user_plan = UserPlan(user_id=g.current_user.id, template_id=template_id, start_date=date.today())
+    # Same optional settings as a custom plan (coaching style, email check-ins,
+    # video check-ins). The plan length always comes from the template.
+    settings, error = _read_custom_settings({**payload, "length_days": template.length_days})
+    if error:
+        return jsonify({"error": error}), 400
+    _, identity_statement, support_style, reminder_times, reminder_timezone, video_frequency = settings
+
+    user_plan = UserPlan(
+        user_id=g.current_user.id,
+        template_id=template_id,
+        identity_statement=identity_statement or None,
+        support_style=support_style,
+        reminder_times=reminder_times,
+        reminder_timezone=reminder_timezone,
+        reminders_enabled=bool(reminder_times),
+        video_checkin_frequency=video_frequency,
+        start_date=_today_in(reminder_timezone),
+        last_checkin_date=_today_in(reminder_timezone),
+    )
     db.session.add(user_plan)
     db.session.commit()
     return jsonify({"user_plan_id": user_plan.id, "start_date": user_plan.start_date.isoformat()}), 201

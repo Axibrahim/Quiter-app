@@ -16,9 +16,11 @@
   transition: opacity 350ms ease;
 }
 
+.bg-video.is-ready { background-image: none !important; }   /* the poster must not show through (or double up) behind the playing video */
 .bg-video.is-ready video {
-  opacity: .82;
+  opacity: 1;
 }
+
 /* The clip's edges are pure black, so sliding it right on wide screens moves the
    flower out from behind the headline without any visible seam. */
 @media (min-width: 861px) { .bg-video video { transform: translateX(17vw); } }
@@ -570,4 +572,30 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
 @media (prefers-reduced-motion: reduce) {
   .bg-video video { transition: none; }
+}
+
+
+/* ---------- Ready-made plans on plans.html (added) ---------- */
+/* Ready-made plans (created by admins) */
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.tpl { border-radius: var(--radius-lg); display: flex; flex-direction: column; }
+.tpl__photo { height: 150px; background: rgba(255,255,255,0.06) center/cover no-repeat; position: relative; }
+.tpl__photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(12,12,20,.85)); }
+.tpl__body { padding: var(--space-3); display: flex; flex-direction: column; gap: .5rem; flex: 1; }
+.tpl__meta { display: flex; gap: .4rem; flex-wrap: wrap; }
+.tpl__meta .badge { white-space: nowrap; }
+.tpl__title { font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+.tpl__desc { margin-bottom: .6rem; font-size: .9rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tpl .btn { margin-top: auto; }
+.modal--wide { max-width: 560px; max-height: 90vh; overflow-y: auto; }
+.modal--wide .group { padding: var(--space-2) 0 0; margin: 0 0 var(--space-2); background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 0; }
+.modal--wide .group::before { display: none; }
+
+/* ---------- Phone background: whole flower above the text (added) ---------- */
+@media (max-width: 860px) {
+  .bg-video { overflow: hidden; background-size: auto 78vh; background-position: 50% 0; }
+  .bg-video video {
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    width: auto; height: 78vh; max-width: none; aspect-ratio: 800 / 855; object-fit: fill;
+  }
 }
