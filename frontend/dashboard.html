@@ -22,6 +22,16 @@
       <a class="btn btn--solid" href="plans.html" id="new-plan">+ New plan</a>
     </div>
     <p class="error" id="dash-error" role="alert"></p>
+        <section class="dashboard-insights" id="dashboard-insights" aria-labelledby="dashboard-insights-title" hidden>
+      <div class="dashboard-insights__head">
+        <div>
+          <p class="eyebrow">Your rhythm</p>
+          <h2 class="h3" id="dashboard-insights-title">Progress insight</h2>
+        </div>
+        <p class="dashboard-insights__caption">Completed check-ins by week</p>
+      </div>
+      <div class="dashboard-insights__list" id="dashboard-insight-list" aria-live="polite"></div>
+    </section>
     <div class="plans" id="plans" aria-live="polite"></div>
   </div>
 </main>

@@ -1,33 +1,34 @@
 /**
- * Background flower video, driven by your scrolling / swiping.
- *
- * The video never "plays" on its own. Every pixel you scroll (or wheel/swipe on
- * a page too short to scroll) moves the playhead, so the glass flower turns as
- * you move. It ping-pongs (forward, then backward) so it never jumps at the end
- * of the clip, and it eases toward its target so it feels fluid, not steppy.
- *
- * Smoothness depends on the file being all-keyframe (see CHANGES.md ffmpeg line).
+ * Scroll-driven background flower video.
+ * Scrubbing eases with input and coasts for 500 ms after the last gesture.
  */
-const SECONDS_PER_1000PX = 1.6;   // flower speed: bigger = faster turning
-const EASE = 0.12;                // 0..1, how quickly the playhead catches up
+const SECONDS_PER_1000PX = 1.6;
+const EASE = 0.12;
+const SWIPE_TAIL_MS = 500;
 
 export function initBackground() {
   if (document.querySelector('.bg-video')) return;
 
   const small = window.matchMedia('(max-width: 760px)').matches;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const wrap = document.createElement('div');
   wrap.className = 'bg-video';
   wrap.setAttribute('aria-hidden', 'true');
   wrap.style.backgroundImage = "url('assets/media/glass-flower-poster.jpg')";
 
-  const video = document.createElement('video');
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = 'auto';
-  video.setAttribute('muted', '');
-  video.setAttribute('playsinline', '');
-  video.src = small ? 'assets/media/glass-flower-mobile.mp4' : 'assets/media/glass-flower.mp4';
-  wrap.appendChild(video);
+  let video = null;
+  if (!reducedMotion) {
+    video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = small ? 'metadata' : 'auto';
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.src = small ? 'assets/media/glass-flower-mobile.mp4' : 'assets/media/glass-flower.mp4';
+    video.addEventListener('canplay', () => wrap.classList.add('is-ready'), { once: true });
+    wrap.appendChild(video);
+  }
 
   const scrim = document.createElement('div');
   scrim.className = 'bg-scrim';
@@ -35,55 +36,126 @@ export function initBackground() {
   document.body.prepend(scrim);
   document.body.prepend(wrap);
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // poster only
+  if (reducedMotion || !video) return;
 
   let duration = 0;
-  let travel = 0;          // total signed distance scrolled, in px
-  let shown = 0;           // eased value actually applied
+  let travel = 0;
+  let shown = 0;
   let lastY = window.scrollY;
   let lastSet = -1;
-  let ready = false;
+  let coastStarted = 0;
+  let coastVelocity = 0;
+  let lastInputAt = 0;
+  let frameId = 0;
 
   const canScroll = () => document.documentElement.scrollHeight > window.innerHeight + 4;
 
+  function scheduleFrame() {
+    if (!frameId && !document.hidden) frameId = requestAnimationFrame(frame);
+  }
+
+  function coastOffset(now) {
+    if (!coastStarted) return 0;
+    const elapsed = Math.max(0, Math.min(SWIPE_TAIL_MS, now - coastStarted));
+    return coastVelocity * 0.18 * (1 - Math.exp(-elapsed / 150));
+  }
+
+  function addTravel(delta) {
+    if (!delta) return;
+
+    const now = performance.now();
+    if (coastStarted) travel += coastOffset(now);
+
+    const elapsed = lastInputAt ? Math.max(16, now - lastInputAt) : 32;
+    coastVelocity = Math.max(-180, Math.min(180, (delta / elapsed) * 1000));
+    coastStarted = now;
+    lastInputAt = now;
+    travel += delta;
+    scheduleFrame();
+  }
+
+  function targetTravel(now) {
+    if (!coastStarted) return travel;
+
+    if (now - coastStarted >= SWIPE_TAIL_MS) {
+      travel += coastOffset(now);
+      coastStarted = 0;
+      return travel;
+    }
+
+    return travel + coastOffset(now);
+  }
+
   video.addEventListener('loadedmetadata', () => {
     duration = video.duration || 0;
-    ready = duration > 0;
-    // iOS/Safari only decode paused videos reliably after one play() "unlock".
-    video.play().then(() => video.pause()).catch(() => {});
-  });
+    if (duration > 0) {
+      video.play().then(() => video.pause()).catch(() => {});
+      scheduleFrame();
+    }
+  }, { once: true });
 
+  video.addEventListener('seeked', scheduleFrame);
   window.addEventListener('scroll', () => {
     const y = window.scrollY;
-    travel += y - lastY;
+    addTravel(y - lastY);
     lastY = y;
   }, { passive: true });
 
-  // Pages too short to scroll: let wheel + touch swipes drive the flower instead.
-  window.addEventListener('wheel', (e) => { if (!canScroll()) travel += e.deltaY; }, { passive: true });
+  window.addEventListener('wheel', (event) => {
+    if (!canScroll()) addTravel(event.deltaY);
+  }, { passive: true });
+
   let touchY = null;
-  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
-  window.addEventListener('touchmove', (e) => {
+  window.addEventListener('touchstart', (event) => {
+    touchY = event.touches[0]?.clientY ?? null;
+  }, { passive: true });
+
+  window.addEventListener('touchmove', (event) => {
     if (touchY === null) return;
-    const y = e.touches[0].clientY;
-    if (!canScroll()) travel += touchY - y;
+    const y = event.touches[0]?.clientY;
+    if (y === undefined) return;
+    if (!canScroll()) addTravel(touchY - y);
     touchY = y;
   }, { passive: true });
 
-  function frame() {
-    requestAnimationFrame(frame);
-    if (!ready || document.hidden) return;
+  window.addEventListener('touchend', () => { touchY = null; }, { passive: true });
+  window.addEventListener('touchcancel', () => { touchY = null; }, { passive: true });
 
-    shown += (travel - shown) * EASE;
-    const seconds = (shown / 1000) * SECONDS_PER_1000PX;
-    const cycle = duration * 2;
-    const p = ((seconds % cycle) + cycle) % cycle;           // 0..2d
-    const t = Math.min(duration - 0.05, p <= duration ? p : cycle - p);   // ping-pong
-
-    if (!video.seeking && Math.abs(t - lastSet) > 0.012) {
-      video.currentTime = t;
-      lastSet = t;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = 0;
+    } else {
+      scheduleFrame();
     }
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = 0;
+    video.pause();
+  });
+
+  function frame() {
+    frameId = 0;
+    if (document.hidden || !duration) return;
+
+    const now = performance.now();
+    const target = targetTravel(now);
+    shown += (target - shown) * EASE;
+
+    if (!video.seeking) {
+      const seconds = (shown / 1000) * SECONDS_PER_1000PX;
+      const cycle = duration * 2;
+      const p = ((seconds % cycle) + cycle) % cycle;
+      const time = Math.min(duration - 0.05, p <= duration ? p : cycle - p);
+
+      if (Math.abs(time - lastSet) > 0.012) {
+        video.currentTime = time;
+        lastSet = time;
+      }
+    }
+
+    if (coastStarted || Math.abs(target - shown) > 0.05) scheduleFrame();
   }
-  requestAnimationFrame(frame);
 }

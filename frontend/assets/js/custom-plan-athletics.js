@@ -8,10 +8,11 @@ const common = mountCommonFields($('common'));
 let catalog = null;       // { max_tracked, metrics, sports: [...] }
 let sport = null;         // selected sport object
 const picked = new Set(); // catalog exercise keys
+let customExerciseCount = 0;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const customRows = () => [...document.querySelectorAll('.custom-ex')];
-const total = () => picked.size + customRows().filter((r) => r.querySelector('input[type=text]').value.trim()).length;
+const total = () => picked.size + customRows().length;
 
 function refreshCount() {
   $('ex-count').textContent = `${total()} / ${catalog.max_tracked}`;
@@ -36,15 +37,42 @@ function renderExercises() {
 
 function addCustomRow() {
   if (total() >= catalog.max_tracked) return;
+
   const row = document.createElement('div');
   row.className = 'custom-ex';
+
+  const inputId = `custom-exercise-${++customExerciseCount}`;
+  const metricId = `${inputId}-metric`;
+
   row.innerHTML = `
-    <input type="text" maxlength="60" placeholder="Exercise name" aria-label="Custom exercise name">
-    <select aria-label="Metric">${Object.entries(catalog.metrics).map(([k, u]) => `<option value="${k}">${esc(u)}</option>`).join('')}</select>
-    <button class="icon-btn" type="button" aria-label="Remove">✕</button>`;
-  row.querySelector('button').addEventListener('click', () => { row.remove(); refreshCount(); });
-  row.querySelector('input').addEventListener('input', refreshCount);
+    <div class="custom-ex__field">
+      <label for="${inputId}">Exercise name</label>
+      <input id="${inputId}" type="text" minlength="2" maxlength="60"
+        autocomplete="off" placeholder="e.g. Cable fly"
+        aria-describedby="custom-exercise-hint" required>
+    </div>
+    <div class="custom-ex__field custom-ex__field--metric">
+      <label for="${metricId}">Track by</label>
+      <select id="${metricId}">
+        ${Object.entries(catalog.metrics).map(([key, unit]) =>
+          `<option value="${esc(key)}">${esc(unit)}</option>`).join('')}
+      </select>
+    </div>
+    <button class="icon-btn custom-ex__remove" type="button" aria-label="Remove custom exercise">Remove</button>`;
+
+  row.querySelector('.custom-ex__remove').addEventListener('click', () => {
+    row.remove();
+    refreshCount();
+  });
+
+  row.querySelector('input').addEventListener('input', (event) => {
+    const length = event.target.value.trim().length;
+    if (length >= 2 && length <= 60) event.target.removeAttribute('aria-invalid');
+    refreshCount();
+  });
+
   $('custom-rows').appendChild(row);
+  refreshCount();
   row.querySelector('input').focus();
 }
 
@@ -63,6 +91,23 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorEl.textContent = '';
   if (!sport) { errorEl.textContent = PLAN_ERRORS.invalid_sport; return; }
+
+    const invalidCustom = customRows().find((row) => {
+    const input = row.querySelector('input[type="text"]');
+    const length = input.value.trim().length;
+    const invalid = length < 2 || length > 60;
+
+    if (invalid) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+
+    return invalid;
+  });
+
+  if (invalidCustom) {
+    errorEl.textContent = PLAN_ERRORS.invalid_tracked_exercises;
+    invalidCustom.querySelector('input').focus();
+    return;
+  }
 
   const tracked = [
     ...[...picked].map((key) => ({ key })),

@@ -73,6 +73,90 @@ function render() {
   listEl.innerHTML = plans.map(cardHtml).join('');
 }
 
+function weekRange(week) {
+  const fmt = (value) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+  return `${fmt(week.start)} – ${fmt(week.end)}`;
+}
+
+function progressInsight(summary) {
+  if (!summary.completed_total) {
+    return 'Your first completed check-in will start your progress trend.';
+  }
+
+  if (summary.prev7_pct !== null && summary.prev7_pct !== undefined) {
+    const change = Number(summary.last7_pct) - Number(summary.prev7_pct);
+    if (change > 0) return `Your check-ins are up ${change} points from the previous week. Keep building on that rhythm.`;
+    if (change < 0) return `Your check-ins are down ${Math.abs(change)} points from the previous week. A small step today can restart the rhythm.`;
+    return `Your check-in pace held steady at ${summary.last7_pct}% this week. Consistency is progress.`;
+  }
+
+  return `You completed ${summary.completed_total} of ${summary.days_elapsed} plan days (${summary.adherence_pct}%) so far. Another week of history will reveal your trend.`;
+}
+
+function insightCard(plan, analytics) {
+  if (!analytics?.summary || !Array.isArray(analytics.weekly)) {
+    return `<article class="insight-plan"><h3>${esc(cleanGoal(plan))}</h3><p class="field__hint">Progress details couldn't load.</p></article>`;
+  }
+
+  const summary = analytics.summary;
+  if (!summary.completed_total) {
+    return `<article class="insight-plan">
+      <div class="insight-plan__head"><h3>${esc(cleanGoal(plan))}</h3><span class="insight-plan__rate">No check-ins yet</span></div>
+      <p class="insight-plan__text">${esc(progressInsight(summary))}</p>
+    </article>`;
+  }
+
+  const bars = analytics.weekly.slice(-8).map((week) => {
+    const pct = Math.max(0, Math.min(100, Number(week.pct) || 0));
+    const completed = Number(week.completed) || 0;
+    const possible = Number(week.possible) || 0;
+
+    return `<li class="insight-chart__week" aria-label="${esc(weekRange(week))}: ${completed} of ${possible} completed">
+      <div class="insight-chart__track" aria-hidden="true"><span style="height:${pct}%"></span></div>
+      <span class="insight-chart__value">${completed}/${possible}</span>
+      <span class="insight-chart__label">${esc(new Date(`${week.start}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span>
+    </li>`;
+  }).join('');
+
+  return `<article class="insight-plan">
+    <div class="insight-plan__head">
+      <h3>${esc(cleanGoal(plan))}</h3>
+      <span class="insight-plan__rate">${Number(summary.adherence_pct) || 0}% overall</span>
+    </div>
+    <p class="insight-plan__text">${esc(progressInsight(summary))}</p>
+    <ol class="insight-chart" aria-label="Weekly completed check-ins">${bars}</ol>
+  </article>`;
+}
+
+async function loadDashboardInsights() {
+  const section = document.getElementById('dashboard-insights');
+  const host = document.getElementById('dashboard-insight-list');
+  const visiblePlans = plans.filter((plan) => !plan.is_abandoned);
+
+  if (!visiblePlans.length) {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+  host.innerHTML = '<p class="field__hint">Loading your progress…</p>';
+
+  const results = await Promise.all(visiblePlans.map(async (plan) => {
+    try {
+      return { plan, analytics: await api.get(`/plans/${plan.user_plan_id}/analytics`) };
+    } catch {
+      return { plan, analytics: null };
+    }
+  }));
+
+  host.innerHTML = results
+    .map(({ plan, analytics }) => insightCard(plan, analytics))
+    .join('');
+}
+
 function replaceCard(p) {
   const old = listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"]`);
   if (old) old.outerHTML = cardHtml(p);
@@ -121,6 +205,7 @@ listEl.addEventListener('change', async (e) => {
   try {
     await complete(card, p);
     replaceCard(p);
+    loadDashboardInsights();
   } catch (ex) {
     box.checked = false; box.disabled = false;
     if (ex.message === 'already_logged_today') { p.already_logged_today = true; replaceCard(p); return; }
@@ -159,6 +244,7 @@ listEl.addEventListener('click', async (e) => {
       const r = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'missed' });
       p.already_logged_today = true; p.current_streak = r.current_streak ?? 0;
       replaceCard(p);
+      loadDashboardInsights();
     } catch (ex) { err.textContent = errorText(ex.message); }
   }
 });
@@ -172,6 +258,7 @@ export async function initDashboard(user) {
   try {
     plans = (await api.get('/plans/mine')).filter((p) => !p.is_abandoned);
     render();
+    loadDashboardInsights();
     loadCoachMessages();
   } catch (ex) {
     errEl.textContent = errorText(ex.message);

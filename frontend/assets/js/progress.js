@@ -60,13 +60,27 @@ export async function initProgress() {
     exit.hidden = p.is_completed || p.is_abandoned;
     exit.addEventListener('click', async () => {
       if (!exit.classList.contains('is-confirming')) {
-        exit.classList.add('is-confirming'); exit.textContent = 'Tap again to exit';
-        setTimeout(() => { exit.classList.remove('is-confirming'); exit.textContent = 'Exit this plan'; }, 4000);
-        return;
-      }
-      try { await api.post(`/plans/${planId}/abandon`); location.href = 'dashboard.html'; }
-      catch (ex) { err.textContent = errorText(ex.message); }
-    });
+      exit.classList.add('is-confirming');
+      exit.textContent = 'Tap again to exit';
+      setTimeout(() => {
+        exit.classList.remove('is-confirming');
+        exit.textContent = 'Exit this plan';
+      }, 4000);
+      return;
+    }
+
+    exit.disabled = true;
+
+    try {
+      await api.post(`/plans/${planId}/abandon`);
+      location.href = 'dashboard.html';
+    } catch (ex) {
+      err.textContent = errorText(ex.message);
+      exit.disabled = false;
+      exit.classList.remove('is-confirming');
+      exit.textContent = 'Exit this plan';
+    }
+  });
 
     initVideoCheckins(planId, p.video_checkin_frequency);
     api.get(`/plans/${planId}/analytics`).then((a) => renderAnalytics(a, !!p.athletic)).catch(() => {});
