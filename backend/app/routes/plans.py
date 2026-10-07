@@ -9,6 +9,7 @@ always includes user_id, enforced at the query layer, not "checked after
 the fact").
 """
 import math
+import logging
 import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -22,6 +23,12 @@ from app.models.models import (
 )
 from app.data.exercise_catalog import (
     CATALOG, METRICS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
+    EXPERIENCE_LEVELS, DIET_STYLES, find_phase, phases_for,
+)
+from app.utils.plan_ai import suggest_plan_name, get_or_create_insight
+from app.security.email import (
+    send_plan_started_email, send_plan_completed_email,
+    send_plan_closed_email, send_streak_milestone_email,
 )
 from app.utils.analytics import build_analytics
 from app.utils.coach_ai import get_or_create_coach_message, get_existing_coach_message
@@ -33,6 +40,9 @@ from app.utils.validation import validate_uuid_param
 
 plans_bp = Blueprint("plans", __name__, url_prefix="/api/v1/plans")
 
+logger = logging.getLogger("quiter.plans")
+CREATE_PLAN_RATE_LIMIT = "10 per hour"
+STREAK_EMAIL_MILESTONES = {7, 14, 30, 60, 100}
 REMINDER_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 SUPPORT_STYLES = {"gentle", "focused", "reflective"}
 MAX_ACTIVE_PLANS = 3
@@ -153,6 +163,8 @@ def _read_athletic_payload(payload):
     Payload:
         sport:               key from the exercise catalog
         progression_goal:    3-200 chars
+        phase:               optional phase key for that sport
+        experience, diet:    optional keys (see exercise_catalog)
         tracked_exercises:   1..8 items, each either
                                {"key": "<catalog exercise key>"}
                              or a custom move
@@ -168,6 +180,21 @@ def _read_athletic_payload(payload):
     progression_goal = progression_goal.strip()
     if not 3 <= len(progression_goal) <= 200:
         return None, "invalid_progression_goal"
+
+    phase_key = payload.get("phase")
+    phase = None
+    if phase_key is not None:
+        phase = find_phase(sport, phase_key)
+        if phase is None:
+            return None, "invalid_phase"
+
+    experience = payload.get("experience") or None
+    if experience is not None and experience not in EXPERIENCE_LEVELS:
+        return None, "invalid_experience"
+
+    diet = payload.get("diet") or None
+    if diet is not None and diet not in DIET_STYLES:
+        return None, "invalid_diet"
 
     raw = payload.get("tracked_exercises")
     if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_TRACKED_EXERCISES:
@@ -208,6 +235,10 @@ def _read_athletic_payload(payload):
         "sport": sport,
         "sport_label": CATALOG[sport]["label"],
         "progression_goal": progression_goal,
+        "phase": phase["key"] if phase else None,
+        "phase_label": phase["label"] if phase else None,
+        "experience": experience,
+        "diet": diet,
         "tracked_exercises": tracked,
     }, None
 
@@ -299,6 +330,50 @@ def _load_plan(user_plan_id):
 
 
 # ---------------------------------------------------------------------------
+# Lifecycle emails (Resend templates). Always called AFTER commit; never raise.
+# ---------------------------------------------------------------------------
+
+def _plan_goal(user_plan):
+    return user_plan.goal_text or user_plan.template.title
+
+
+def _notify_plan_started(user_plan):
+    """Call AFTER commit. Never raises (email failures must not break plan creation)."""
+    try:
+        times = user_plan.reminder_times or []
+        when = f"{', '.join(times)} ({user_plan.reminder_timezone})" if times else "No reminders set"
+        send_plan_started_email(
+            g.current_user.email, g.current_user.display_name, _plan_goal(user_plan),
+            user_plan.template.length_days, when, idempotency_key=f"plan-started:{user_plan.id}",
+        )
+    except Exception:
+        logger.exception("plan-started email failed")
+
+
+def _notify_after_checkin(user_plan, result):
+    """Call AFTER commit with the dict from _record_checkin. Sends the completion or
+    streak-milestone email. Never raises."""
+    if not result or result.get("status") != LogStatus.COMPLETED.value:
+        return
+    try:
+        user = user_plan.user
+        if result.get("is_completed"):
+            days_logged = DailyLog.query.filter_by(
+                user_plan_id=user_plan.id, status=LogStatus.COMPLETED).count()
+            send_plan_completed_email(
+                user.email, user.display_name, _plan_goal(user_plan), user_plan.template.length_days,
+                days_logged, user_plan.longest_streak, idempotency_key=f"plan-completed:{user_plan.id}",
+            )
+        elif result.get("current_streak") in STREAK_EMAIL_MILESTONES:
+            send_streak_milestone_email(
+                user.email, user.display_name, _plan_goal(user_plan), result["current_streak"],
+                idempotency_key=f"streak:{user_plan.id}:{result['current_streak']}",
+            )
+    except Exception:
+        logger.exception("lifecycle email failed")
+
+
+# ---------------------------------------------------------------------------
 # Dashboard / catalog
 # ---------------------------------------------------------------------------
 
@@ -329,6 +404,7 @@ def my_plans():
             "plan_type": _plan_type(up),
             "category": up.template.category,
             "sport_label": meta.get("sport_label"),
+            "phase_label": meta.get("phase_label"),
             "tracked_exercise_count": len(_tracked_exercises(up)),
             "tracked_exercises": _tracked_exercises(up),
             "today_values": today_values,
@@ -394,12 +470,14 @@ def list_templates():
 
 @plans_bp.route("/exercise-catalog", methods=["GET"])
 def get_exercise_catalog():
-    """Public: sports -> exercises (with metric + unit) for the athlete picker."""
+    """Public: sports -> exercises (with metric + unit) and phases for the athlete picker."""
     return jsonify({
         "max_tracked": MAX_TRACKED_EXERCISES,
         "metrics": METRICS,
+        "experience_levels": EXPERIENCE_LEVELS,
+        "diet_styles": DIET_STYLES,
         "sports": [
-            {"key": key, "label": sport["label"], "exercises": sport["exercises"]}
+            {"key": key, "label": sport["label"], "exercises": sport["exercises"], "phases": phases_for(key)}
             for key, sport in CATALOG.items()
         ],
     }), 200
@@ -453,6 +531,7 @@ def adopt_plan():
     )
     db.session.add(user_plan)
     db.session.commit()
+    _notify_plan_started(user_plan)
     return jsonify({"user_plan_id": user_plan.id, "start_date": user_plan.start_date.isoformat()}), 201
 
 
@@ -509,6 +588,7 @@ def checkin(user_plan_id):
         db.session.rollback()
         return jsonify({"error": "already_logged_today"}), 409
 
+    _notify_after_checkin(user_plan, result)
     return jsonify(result), 200
 
 
@@ -581,6 +661,7 @@ def log_exercises(user_plan_id):
         db.session.rollback()
         return jsonify({"error": "conflict"}), 409
 
+    _notify_after_checkin(user_plan, checkin_result)
     return jsonify({"saved": cleaned, "checkin": checkin_result}), 200
 
 
@@ -627,6 +708,7 @@ def get_progress(user_plan_id):
         athletic = {
             "sport": meta.get("sport"),
             "sport_label": meta.get("sport_label"),
+            "phase_label": meta.get("phase_label"),
             "progression_goal": meta.get("progression_goal"),
             "tracked_exercises": _tracked_exercises(user_plan),
             "today_values": {row.exercise_key: row.value for row in today_rows},
@@ -713,6 +795,15 @@ def abandon_plan(user_plan_id):
 
     user_plan.is_abandoned = True
     db.session.commit()
+
+    try:
+        send_plan_closed_email(
+            g.current_user.email, g.current_user.display_name,
+            _plan_goal(user_plan), idempotency_key=f"plan-closed:{user_plan.id}",
+        )
+    except Exception:
+        logger.exception("plan-closed email failed")
+
     return jsonify({"ok": True}), 200
 
 
@@ -729,6 +820,7 @@ def _daily_action(support_style, target):
 
 
 @plans_bp.route("/custom", methods=["POST"])
+@limiter.limit(CREATE_PLAN_RATE_LIMIT)
 @login_required
 def create_custom_plan():
     """
@@ -738,6 +830,7 @@ def create_custom_plan():
     UserPlan stores the user's goal, support style, reminders, timezone and
     the optional video check-in frequency. "direction" is legacy and optional
     (defaults to "build") — the app is a personal coach now, not break/build.
+    The template title is a short AI-written plan name (free fallback).
     """
     payload = request.get_json(silent=True) or {}
 
@@ -764,9 +857,11 @@ def create_custom_plan():
     if not identity_statement:
         identity_statement = f"I am someone who follows through on: {goal_text}."[:160]
 
+    plan_name = suggest_plan_name("personal", goal_text)
+
     template = PlanTemplate(
         slug=f"custom-{gen_uuid()[:8]}",
-        title=goal_text[:120],
+        title=plan_name,
         identity_statement=identity_statement,
         direction=HabitDirection(direction),
         category="custom",
@@ -794,6 +889,7 @@ def create_custom_plan():
     )
     db.session.add(user_plan)
     db.session.commit()
+    _notify_plan_started(user_plan)
 
     return jsonify({
         "user_plan_id": user_plan.id,
@@ -812,12 +908,14 @@ def create_custom_plan():
 
 
 @plans_bp.route("/custom-athletic", methods=["POST"])
+@limiter.limit(CREATE_PLAN_RATE_LIMIT)
 @login_required
 def create_athletic_plan():
     """
-    Athlete plan: pick a sport, then up to 8 exercises to track every day
-    (catalog moves and/or custom ones). Sport, goal and the tracked list live
-    in athletic_metadata (JSONB) rather than bloating UserPlan with columns.
+    Athlete plan: pick a sport, a phase, then up to 8 exercises to track every
+    day (catalog moves and/or custom ones). Sport, phase, goal and the tracked
+    list live in athletic_metadata (JSONB) rather than bloating UserPlan with
+    columns. The template title is a short AI-written plan name (free fallback).
     """
     payload = request.get_json(silent=True) or {}
 
@@ -848,9 +946,12 @@ def create_athletic_plan():
     else:
         daily_action = f"Notice how your body feels, train, log your numbers, and move toward — {progression_goal}."
 
+    plan_name = suggest_plan_name("athlete", progression_goal, sport_label, athletic_fields.get("phase_label"))
+    athletic_fields["plan_name"] = plan_name
+
     template = PlanTemplate(
         slug=f"athletic-{gen_uuid()[:8]}",
-        title=goal_text[:120],
+        title=plan_name,
         identity_statement=identity_statement,
         direction=HabitDirection.BUILD,
         category=athletic_fields["sport"],
@@ -879,6 +980,7 @@ def create_athletic_plan():
     )
     db.session.add(user_plan)
     db.session.commit()
+    _notify_plan_started(user_plan)
 
     return jsonify({
         "user_plan_id": user_plan.id,
@@ -963,7 +1065,7 @@ def set_video_frequency(user_plan_id):
 
 
 # ---------------------------------------------------------------------------
-# Coach message (dashboard) + one-tap email check-in
+# Coach message + weekly tips (dashboard) + one-tap email check-in
 # ---------------------------------------------------------------------------
 
 @plans_bp.route("/<user_plan_id>/coach-message", methods=["GET"])
@@ -982,6 +1084,22 @@ def get_coach_message(user_plan_id):
     today = _local_today(user_plan)
     row = get_or_create_coach_message(user_plan, today)
     return jsonify({"message": row.body, "source": row.source, "date": today.isoformat()}), 200
+
+
+@plans_bp.route("/<user_plan_id>/insights", methods=["GET"])
+@limiter.limit(COACH_MESSAGE_RATE_LIMIT)
+@login_required
+def get_insights(user_plan_id):
+    """This week's personalised tips (food / training / recovery for athletes).
+    Cached per plan per week, so most calls cost zero AI tokens."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
+    if user_plan.is_completed or user_plan.is_abandoned:
+        return jsonify({"tips": []}), 200
+
+    row = get_or_create_insight(user_plan, _local_today(user_plan))
+    return jsonify({"tips": row.tips, "source": row.source}), 200
 
 
 @plans_bp.route("/email-checkin", methods=["POST"])
@@ -1032,6 +1150,7 @@ def email_checkin():
                         "current_streak": user_plan.current_streak,
                         "is_completed": user_plan.is_completed}), 200
 
+    _notify_after_checkin(user_plan, result)
     return jsonify({**base, "already_logged": False,
                     "current_streak": result["current_streak"],
                     "is_completed": result["is_completed"]}), 200

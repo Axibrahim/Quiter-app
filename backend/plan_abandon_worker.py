@@ -15,6 +15,7 @@ import logging
 import os
 import time
 from datetime import date, timedelta
+from app.security.email import send_plan_closed_email
 
 from app import create_app
 from app.models.models import db, UserPlan
@@ -40,13 +41,17 @@ def abandon_stale_plans():
 
     for plan in stale_plans:
         plan.is_abandoned = True
-        logger.info(
-            "Auto-abandoning plan %s (last check-in %s)",
-            plan.id, plan.last_checkin_date,
-        )
+        logger.info("Auto-abandoning plan %s (last check-in %s)", plan.id, plan.last_checkin_date)
 
     if stale_plans:
         db.session.commit()
+        for plan in stale_plans:
+            if plan.user and plan.user.email:
+                send_plan_closed_email(
+                    plan.user.email, plan.user.display_name,
+                    plan.goal_text or plan.template.title,
+                    idempotency_key=f"plan-closed:{plan.id}",
+                )
 
     db.session.remove()
     return len(stale_plans)

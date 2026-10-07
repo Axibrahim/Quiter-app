@@ -319,3 +319,20 @@ class CoachMessage(db.Model):
     __table_args__ = (
         UniqueConstraint("user_plan_id", "message_date", name="uq_one_coach_message_per_day"),
     )
+
+
+class PlanInsight(db.Model):
+    """Weekly AI (or fallback) tips for one plan. One row per plan per week per set of inputs,
+    so the dashboard never pays for the same tips twice."""
+    __tablename__ = "plan_insights"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    user_plan_id = Column(UUID(as_uuid=False), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    period_key = Column(String(80), nullable=False)
+    tips = Column(JSONB, nullable=False)
+    source = Column(String(16), nullable=False, default="fallback")   # "ai" | "fallback"
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_plan_id", "period_key", name="uq_one_insight_per_period"),
+    )

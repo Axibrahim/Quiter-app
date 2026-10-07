@@ -31,7 +31,7 @@ from sqlalchemy.exc import IntegrityError
 from app import create_app
 from app.models.models import db, DailyLog, ReminderDelivery, User, UserPlan
 from app.security.checkin_tokens import make_checkin_token
-from app.security.email import send_goal_reminder_email, _APP_BASE_URL
+from app.security.email import send_goal_reminder_email, send_comeback_email, _APP_BASE_URL
 from app.utils.coach_ai import get_or_create_coach_message
 
 logging.basicConfig(
@@ -128,21 +128,35 @@ def process_due_reminders() -> int:
                 continue
 
             day_number = max(1, min((local_date - plan.start_date).days + 1, plan.template.length_days))
-            coach = get_or_create_coach_message(plan, local_date)
-            token = make_checkin_token(plan.id, local_date)
+            gap = (local_date - plan.last_checkin_date).days
+            first_slot = reminder_time == (plan.reminder_times or [None])[0]
 
-            ok = send_goal_reminder_email(
-                email=plan.user.email,
-                display_name=plan.user.display_name,
-                goal_text=plan.goal_text or plan.template.title,
-                day_number=day_number,
-                total_days=plan.template.length_days,
-                support_style=plan.support_style or "gentle",
-                checkin_url=f"{_APP_BASE_URL}/checkin.html?token={token}",
-                coach_message=coach.body if coach else None,
-                streak=plan.current_streak,
-                video_due=_video_due(plan, day_number),
-            )
+            if gap == 5 and first_slot:
+                # Quiet for 5 days: send the gentle comeback email instead of the normal reminder.
+                ok = send_comeback_email(
+                    email=plan.user.email,
+                    display_name=plan.user.display_name,
+                    goal_text=plan.goal_text or plan.template.title,
+                    days_missed=gap,
+                    days_left=max(0, plan.template.length_days - day_number),
+                    idempotency_key=f"comeback:{plan.id}:{local_date}",
+                )
+            else:
+                coach = get_or_create_coach_message(plan, local_date)
+                token = make_checkin_token(plan.id, local_date)
+                ok = send_goal_reminder_email(
+                    email=plan.user.email,
+                    display_name=plan.user.display_name,
+                    goal_text=plan.goal_text or plan.template.title,
+                    day_number=day_number,
+                    total_days=plan.template.length_days,
+                    support_style=plan.support_style or "gentle",
+                    checkin_url=f"{_APP_BASE_URL}/checkin.html?token={token}",
+                    coach_message=coach.body if coach else None,
+                    streak=plan.current_streak,
+                    video_due=_video_due(plan, day_number),
+                    idempotency_key=f"reminder:{plan.id}:{local_date}:{reminder_time}",
+                )
 
             if ok:
                 sent_count += 1

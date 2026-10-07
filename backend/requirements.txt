@@ -11,3 +11,4 @@ python-dotenv==1.0.1
 Flask-Cors==4.0.1
 resend==2.4.0
 requests==2.32.3
+tzdata==2026.5

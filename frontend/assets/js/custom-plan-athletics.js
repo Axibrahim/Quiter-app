@@ -26,6 +26,17 @@ function renderSports() {
     `<label class="chip"><input type="radio" name="sport" value="${esc(s.key)}"><span>${esc(s.label)}</span></label>`).join('');
 }
 
+function renderPhases() {
+  $('phases').innerHTML = sport.phases.map((p) =>
+    `<label class="chip"><input type="radio" name="phase" value="${esc(p.key)}"><span>${esc(p.label)}</span></label>`).join('');
+  $('phase-group').hidden = false;
+}
+
+function fillSelect(el, map, blank) {
+  el.innerHTML = `<option value="">${esc(blank)}</option>` +
+    Object.entries(map).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+}
+
 function renderExercises() {
   picked.clear();
   $('exercises').innerHTML = sport.exercises.map((ex) =>

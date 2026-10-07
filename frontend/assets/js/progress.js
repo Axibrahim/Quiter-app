@@ -42,9 +42,11 @@ export async function initProgress() {
     }
 
     const p = await api.get(`/plans/${planId}/progress`);
-    $('p-kind').textContent = p.plan_type === 'athletic' ? `Athlete plan · ${p.athletic?.sport_label || ''}` : 'Personal plan';
-    const sportLabel = p.athletic?.sport_label;
-    $('p-title').textContent = sportLabel && p.goal_text.startsWith(`${sportLabel} — `) ? p.goal_text.slice(sportLabel.length + 3) : p.goal_text;
+    $('p-kind').textContent = p.plan_type === 'athletic'
+      ? ['Athlete plan', p.athletic?.sport_label, p.athletic?.phase_label?.split('—')[0].trim()].filter(Boolean).join(' · ')
+      : 'Personal plan';
+    const cleaned = sportLabel && p.goal_text.startsWith(`${sportLabel} — `) ? p.goal_text.slice(sportLabel.length + 3) : p.goal_text;
+    $('p-title').textContent = p.plan_type !== 'catalog' && p.title && p.title !== p.goal_text ? p.title : cleaned;
     $('s-day').textContent = `${p.day_number}/${p.total_days}`;
     $('s-streak').textContent = p.current_streak;
     $('s-best').textContent = p.longest_streak;

@@ -14,6 +14,17 @@ let plans = [];
 
 // Athlete goals are stored as "Sport — target"; the sport already shows as a badge.
 const cleanGoal = (p) => (p.sport_label && p.goal_text.startsWith(`${p.sport_label} — `) ? p.goal_text.slice(p.sport_label.length + 3) : p.goal_text);
+// AI-written plan name when there is one; older plans fall back to the goal text.
+const headline = (p) => (p.plan_type !== 'catalog' && p.title && p.title !== p.goal_text ? p.title : cleanGoal(p));
+const phaseShort = (p) => (p.phase_label ? p.phase_label.split('—')[0].trim() : '');
+const TIP_LABEL = { food: 'Food', train: 'Training', recovery: 'Recovery', habit: 'Habit', focus: 'Focus' };
+
+function tipsHtml(p) {
+  if (p.is_completed || !p.tips?.length) return '';
+  return `<div class="tips"><p class="tips__label">Picked for you</p><ul class="tips__list">${p.tips.map((t) =>
+    `<li class="tip"><span class="tip__kind tip__kind--${esc(t.k)}">${esc(TIP_LABEL[t.k] || 'Tip')}</span><span class="tip__text">${esc(t.t)}</span></li>`).join('')}</ul></div>`;
+}
+
 
 function exerciseInputs(p) {
   if (p.plan_type !== 'athletic' || !p.tracked_exercises.length) return '';
@@ -41,10 +52,12 @@ function cardHtml(p) {
   <article class="plan liquid-glass liquid-glass--panel ${done ? 'is-done' : ''}" data-id="${esc(p.user_plan_id)}">
     <div class="plan__top"><span class="badge ${athlete ? 'badge--athlete' : ''}">${athlete ? esc(p.sport_label || 'Athlete') : 'Personal'}</span>
       <span class="plan__day">Day ${p.day_number} of ${p.total_days}</span></div>
-    <h2 class="plan__title">${esc(cleanGoal(p))}</h2>
+        <h2 class="plan__title">${esc(headline(p))}</h2>
+    ${(phaseShort(p) || headline(p) !== cleanGoal(p)) ? `<p class="plan__sub">${esc([phaseShort(p), cleanGoal(p)].filter((x) => x && x !== headline(p)).join(' · '))}</p>` : ''}
     <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
     <div class="plan__stats"><span>Streak <b>${p.current_streak}</b></span><span>Best <b>${p.longest_streak}</b></span></div>
     ${coach}
+    <div data-tips>${tipsHtml(p)}</div>
     ${!p.is_completed && p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
     ${!p.is_completed && p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
     ${exerciseInputs(p)}
@@ -56,6 +69,7 @@ function cardHtml(p) {
         ${!done ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>' : ''}
         ${video}
         <a class="btn btn--text btn--sm" href="progress.html?plan=${esc(p.user_plan_id)}">Progress</a>
+        ${!p.is_completed ? '<button class="btn btn--exit btn--sm" type="button" data-exit>Exit plan</button>' : ''}
       </div>
     </div>
   </article>`;
@@ -104,7 +118,7 @@ function insightCard(plan, analytics) {
   const summary = analytics.summary;
   if (!summary.completed_total) {
     return `<article class="insight-plan">
-      <div class="insight-plan__head"><h3>${esc(cleanGoal(plan))}</h3><span class="insight-plan__rate">No check-ins yet</span></div>
+      <div class="insight-plan__head"><h3>${esc(headline(plan))}</h3><span class="insight-plan__rate">No check-ins yet</span></div>
       <p class="insight-plan__text">${esc(progressInsight(summary))}</p>
     </article>`;
   }
@@ -181,6 +195,14 @@ async function loadCoachMessages() {
   }));
 }
 
+async function loadTips() {
+  await Promise.all(plans.filter((p) => !p.tips && !p.is_completed && !p.is_abandoned).map(async (p) => {
+    try { p.tips = (await api.get(`/plans/${p.user_plan_id}/insights`)).tips || []; } catch { p.tips = []; }
+    const box = listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"] [data-tips]`);
+    if (box) box.innerHTML = tipsHtml(p);
+  }));
+}
+
 async function complete(card, p) {
   const entries = p.plan_type === 'athletic' ? readEntries(card) : [];
   let result;
@@ -233,6 +255,24 @@ listEl.addEventListener('click', async (e) => {
     return;
   }
 
+  const exit = e.target.closest('[data-exit]');
+  if (exit) {
+    if (!exit.classList.contains('is-confirming')) {
+      exit.classList.add('is-confirming'); exit.textContent = 'Tap again to exit';
+      setTimeout(() => { exit.classList.remove('is-confirming'); exit.textContent = 'Exit plan'; }, 4000);
+      return;
+    }
+    exit.disabled = true;
+    try {
+      await api.post(`/plans/${p.user_plan_id}/abandon`);
+      plans = plans.filter((x) => x.user_plan_id !== p.user_plan_id);
+      render();
+      loadDashboardInsights();
+    } catch (ex) { err.textContent = errorText(ex.message); exit.disabled = false; }
+    return;
+  }
+
+
   const miss = e.target.closest('[data-miss]');
   if (miss) {
     if (!miss.classList.contains('is-confirming')) {
@@ -260,6 +300,7 @@ export async function initDashboard(user) {
     render();
     loadDashboardInsights();
     loadCoachMessages();
+    loadTips();
   } catch (ex) {
     errEl.textContent = errorText(ex.message);
   }

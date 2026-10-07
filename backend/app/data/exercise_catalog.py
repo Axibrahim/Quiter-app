@@ -211,3 +211,147 @@ def find_exercise(sport_key, exercise_key):
 
 def custom_exercise_key(label: str) -> str:
     return f"custom-{_slug(label)}"[:60]
+
+
+# ---------------------------------------------------------------------------
+# Training phases: (key, label, intent). The AI reads label + intent.
+# intent: gain | lose | perform | maintain | skill | recover
+# ---------------------------------------------------------------------------
+_COMEBACK = ("comeback", "Coming back from a break", "recover")
+
+_RAW_PHASES = {
+    "weightlifting": [
+        ("bulking", "Bulking — gain muscle", "gain"),
+        ("cutting", "Cutting — lose fat", "lose"),
+        ("recomp", "Recomposition — build and lean out", "maintain"),
+        ("maintenance", "Maintenance", "maintain"),
+        ("strength_peak", "Strength peak", "perform"),
+    ],
+    "calisthenics": [
+        ("skill_learning", "Learning a skill", "skill"),
+        ("muscle_gain", "Building muscle", "gain"),
+        ("fat_loss", "Leaning out", "lose"),
+        ("rep_endurance", "Rep endurance", "perform"),
+    ],
+    "running": [
+        ("base_building", "Base building", "perform"),
+        ("race_prep", "Race preparation", "perform"),
+        ("speed_work", "Speed work", "perform"),
+        ("weight_loss", "Weight loss", "lose"),
+        ("recovery_block", "Recovery block", "recover"),
+    ],
+    "swimming": [
+        ("base_building", "Base building", "perform"),
+        ("race_prep", "Race preparation", "perform"),
+        ("technique", "Technique focus", "skill"),
+        ("weight_loss", "Weight loss", "lose"),
+    ],
+    "cycling": [
+        ("base_building", "Base building", "perform"),
+        ("race_prep", "Race preparation", "perform"),
+        ("climbing_power", "Climbing and power", "perform"),
+        ("weight_loss", "Weight loss", "lose"),
+    ],
+    "boxing": [
+        ("fight_camp", "Fight camp", "perform"),
+        ("skill_building", "Skill building", "skill"),
+        ("conditioning", "Conditioning", "perform"),
+        ("getting_leaner", "Getting leaner", "lose"),
+        ("off_season", "Off-season", "maintain"),
+    ],
+    "martial_arts": [
+        ("competition_prep", "Competition prep", "perform"),
+        ("skill_building", "Skill building", "skill"),
+        ("conditioning", "Conditioning", "perform"),
+        ("getting_leaner", "Getting leaner", "lose"),
+        ("off_season", "Off-season", "maintain"),
+    ],
+    "football": [
+        ("pre_season", "Pre-season", "perform"),
+        ("in_season", "In-season", "maintain"),
+        ("off_season", "Off-season", "maintain"),
+        ("skill_building", "Skill building", "skill"),
+        ("gain_strength", "Gaining strength", "gain"),
+    ],
+    "basketball": [
+        ("pre_season", "Pre-season", "perform"),
+        ("in_season", "In-season", "maintain"),
+        ("off_season", "Off-season", "maintain"),
+        ("skill_building", "Skill building", "skill"),
+        ("gain_strength", "Gaining strength", "gain"),
+    ],
+    "tennis": [
+        ("pre_season", "Pre-season", "perform"),
+        ("in_season", "In-season", "maintain"),
+        ("off_season", "Off-season", "maintain"),
+        ("skill_building", "Skill building", "skill"),
+        ("gain_strength", "Gaining strength", "gain"),
+    ],
+    "volleyball": [
+        ("pre_season", "Pre-season", "perform"),
+        ("in_season", "In-season", "maintain"),
+        ("off_season", "Off-season", "maintain"),
+        ("skill_building", "Skill building", "skill"),
+        ("gain_strength", "Gaining strength", "gain"),
+    ],
+    "climbing": [
+        ("project_peak", "Projecting / peaking", "perform"),
+        ("base_strength", "Building strength", "gain"),
+        ("technique", "Technique focus", "skill"),
+    ],
+    "yoga": [
+        ("flexibility", "Flexibility", "skill"),
+        ("strength", "Strength through movement", "gain"),
+        ("relaxation", "Relaxation and recovery", "recover"),
+        ("consistency", "Daily consistency", "maintain"),
+    ],
+    "crossfit": [
+        ("competition_prep", "Competition prep", "perform"),
+        ("general_strength", "General strength", "gain"),
+        ("fat_loss", "Fat loss", "lose"),
+        ("skill_work", "Skill work", "skill"),
+    ],
+    "rowing": [
+        ("base_building", "Base building", "perform"),
+        ("race_prep", "Race preparation", "perform"),
+        ("power", "Building power", "gain"),
+    ],
+    "general": [
+        ("lose_weight", "Lose weight", "lose"),
+        ("gain_weight", "Gain weight", "gain"),
+        ("maintain", "Maintain", "maintain"),
+        ("build_endurance", "Build endurance", "perform"),
+        ("get_stronger", "Get stronger", "gain"),
+        ("build_habit", "Build the habit", "maintain"),
+    ],
+}
+
+
+def _build_phases():
+    out = {}
+    for sport_key in CATALOG:
+        rows = list(_RAW_PHASES.get(sport_key) or _RAW_PHASES["general"]) + [_COMEBACK]
+        out[sport_key] = [{"key": k, "label": label, "intent": intent} for k, label, intent in rows]
+    return out
+
+
+PHASES = _build_phases()
+
+EXPERIENCE_LEVELS = {"beginner": "Beginner", "intermediate": "Intermediate", "advanced": "Advanced"}
+
+DIET_STYLES = {
+    "no_preference": "No preference", "vegetarian": "Vegetarian", "vegan": "Vegan",
+    "pescatarian": "Pescatarian", "high_protein": "High-protein", "low_carb": "Low-carb",
+    "halal": "Halal", "kosher": "Kosher",
+}
+
+
+def phases_for(sport_key):
+    return PHASES.get(sport_key, [])
+
+
+def find_phase(sport_key, phase_key):
+    for phase in phases_for(sport_key):
+        if phase["key"] == phase_key:
+            return phase
+    return None

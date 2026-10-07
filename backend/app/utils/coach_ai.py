@@ -33,10 +33,9 @@ import hashlib
 import logging
 import os
 import re
-import time
+from app.utils import ai_client
 from datetime import date, datetime, timezone
 
-import requests
 from sqlalchemy.exc import IntegrityError
 
 from app.models.models import db, CoachMessage
@@ -127,6 +126,7 @@ def build_context(user_plan, local_date: date) -> dict:
     day = max(1, min((local_date - user_plan.start_date).days + 1, total))
     ctx = {
         "plan_id": str(user_plan.id),
+        "phase": (meta.get("phase_label") or "").split("—")[0].strip()[:30],
         "name": _first_name(user_plan.user.display_name),
         "goal": (meta.get("progression_goal") or user_plan.goal_text or user_plan.template.title or "your goal")[:120],
         "style": user_plan.support_style if user_plan.support_style in STYLE_HINT else "gentle",
@@ -169,33 +169,10 @@ def wants_ai(ctx: dict) -> bool:
         every = int(os.environ.get("AI_STEADY_EVERY", "3") or 0)
         if every <= 0 or ctx["day"] % every != 0:
             return False
-    return _under_daily_budget() and not _breaker_open()
+    return ai_client.can_use_ai()
 
 
-def _under_daily_budget() -> bool:
-    limit = int(os.environ.get("AI_DAILY_CALL_LIMIT", "300"))
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-    used = CoachMessage.query.filter(CoachMessage.source == "ai", CoachMessage.created_at >= start).count()
-    return used < limit
 
-
-# --- circuit breaker (per process) ------------------------------------------
-_fail_count = 0
-_open_until = 0.0
-
-def _breaker_open() -> bool:
-    return time.time() < _open_until
-
-def _record_result(ok: bool) -> None:
-    global _fail_count, _open_until
-    if ok:
-        _fail_count = 0
-        return
-    _fail_count += 1
-    if _fail_count >= 3:
-        _open_until = time.time() + 300
-        _fail_count = 0
-        logger.warning("coach_ai: 3 failures in a row, pausing AI for 5 minutes")
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +207,8 @@ def template_message(ctx: dict) -> str:
 
 def _user_prompt(ctx: dict) -> str:
     extra = f" sport={ctx['sport']}" if ctx["sport"] else ""
+    if ctx.get("phase"):
+        extra += f" phase={ctx['phase']}"
     return (f"<d>name={ctx['name']} goal={ctx['goal']}{extra} day={ctx['day']}/{ctx['total']} "
             f"streak={ctx['streak']} missed_days={ctx['days_since_checkin']}</d>\n"
             f"moment: {MOMENT_HINT[ctx['moment']]}; tone: {STYLE_HINT[ctx['style']]}")
@@ -273,17 +252,9 @@ def _call_openai_compatible(api_key: str, ctx: dict):
 def generate_message(ctx: dict):
     """Return (text, source). Never raises."""
     if wants_ai(ctx):
-        api_key = os.environ["AI_API_KEY"].strip()
-        provider = (os.environ.get("AI_PROVIDER") or "anthropic").lower()
-        try:
-            raw = _call_openai_compatible(api_key, ctx) if provider == "openai" else _call_anthropic(api_key, ctx)
-            text = _clean(raw)
-            _record_result(bool(text))
-            if text:
-                return text, "ai"
-        except Exception:
-            _record_result(False)
-            logger.exception("coach_ai: provider call failed; using template")
+        text = _clean(ai_client.complete(SYSTEM_PROMPT, _user_prompt(ctx), max_tokens=80))
+        if text:
+            return text, "ai"
     return template_message(ctx), "fallback"
 
 

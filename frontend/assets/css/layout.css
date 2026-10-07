@@ -599,3 +599,56 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     width: auto; height: 78vh; max-width: none; aspect-ratio: 800 / 855; object-fit: fill;
   }
 }
+
+/* ===== Update: visible exit button, AI tips, input polish, phone fixes ===== */
+.btn--exit {
+  min-height: 3rem;
+  padding: .75rem 1.3rem;
+  border: 1px solid rgba(255, 107, 74, .75);
+  background: linear-gradient(135deg, rgba(255, 107, 74, .34), rgba(255, 107, 74, .16));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(255, 107, 74, .12), 0 8px 26px rgba(255, 107, 74, .2);
+}
+.btn--exit::before { content: '✕'; margin-right: .55rem; font-size: .8em; opacity: .9; }
+.btn--exit:hover { border-color: #ff6b4a; background: linear-gradient(135deg, rgba(255, 107, 74, .5), rgba(255, 107, 74, .24)); }
+.btn--exit.is-confirming { background: #ff6b4a; border-color: #ff6b4a; color: #1a0a06; }
+.plan__links .btn--exit { margin-left: auto; }
+
+.plan__sub { margin-top: -.45rem; color: var(--ink-70); font-size: .92rem; }
+.plan [data-tips]:empty { display: none; }
+.tips { padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: rgba(255,255,255,.05); border-left: 2px solid var(--accent-teal); }
+.tips__label { margin-bottom: .5rem; font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-teal); }
+.tips__list { list-style: none; display: grid; gap: .55rem; margin: 0; padding: 0; }
+.tip { display: flex; gap: .7rem; align-items: baseline; }
+.tip__kind { flex: none; min-width: 4.6rem; padding: .15rem .55rem; border-radius: var(--radius-full); background: rgba(255,255,255,.1); color: var(--ink-70); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; text-align: center; }
+.tip__kind--food { color: var(--accent-gold); }
+.tip__kind--train { color: var(--accent-teal); }
+.tip__kind--recovery { color: var(--accent-violet); }
+.tip__text { color: var(--ink); font-size: .93rem; line-height: 1.5; }
+
+/* "Add your own exercise" + hint (these classes were used in the HTML but never styled) */
+.custom-exercise-hint { margin-top: .6rem; }
+.custom-exercise-add { width: 100%; margin-top: .8rem; justify-content: center; }
+.custom-ex__remove { cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
+.custom-ex__remove:hover { color: var(--ink); border-color: rgba(255, 107, 74, .6); background: rgba(255, 107, 74, .1); }
+.custom-ex input:hover, .custom-ex select:hover { border-color: rgba(255,255,255,.28); }
+
+/* Phones */
+.ex-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); }
+.tpl-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.modal--wide { max-height: 90dvh; }
+html { -webkit-text-size-adjust: 100%; }
+
+@media (max-width: 860px) {
+  .page { min-height: 100svh; padding-top: calc(6rem + env(safe-area-inset-top, 0px)); padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px)); }
+  /* 16px stops iOS Safari from zooming the page when an input is focused */
+  .field input, .field textarea, .field select, .ex-input input, .input { font-size: 16px; }
+}
+@media (max-width: 560px) {
+  .progress-head .btn--exit { width: 100%; }
+  .plan__links .btn--exit { margin-left: 0; width: 100%; }
+  .tip { flex-direction: column; gap: .25rem; }
+  .dash-head .btn { width: 100%; }
+  .group { padding: var(--space-2); }
+}
