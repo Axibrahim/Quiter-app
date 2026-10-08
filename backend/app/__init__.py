@@ -23,10 +23,15 @@ from app.routes.admin import admin_bp
 def create_app(config_name: str = "production") -> Flask:
     app = Flask(__name__)
 
+    if config_name == "production":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # --- Core config -------------------------------------------------
     # SECRET_KEY signs the session cookie. It MUST come from the environment
     # in every real deployment — a hardcoded fallback here would mean anyone
     # reading this source file could forge session cookies for any user.
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
     app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

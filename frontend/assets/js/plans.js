@@ -7,7 +7,6 @@ import { openAuthModal } from './modules/auth-modal.js';
 import { mountCommonFields, PLAN_ERRORS } from './modules/plan-form.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const DIRECTION = { build: 'Build a habit', break: 'Break a habit' };
 
 let templates = [];
 let modal = null;
@@ -20,7 +19,7 @@ function card(t) {
   return `<article class="tpl liquid-glass liquid-glass--panel" data-reveal>
     ${photo}
     <div class="tpl__body">
-      <div class="tpl__meta"><span class="badge">${t.length_days} days</span><span class="badge">${esc(DIRECTION[t.direction] || t.category || 'Plan')}</span></div>
+      <div class="tpl__meta"><span class="badge">${t.length_days} days</span><span class="badge">${esc(t.category || 'Plan')}</span></div>
       <h3 class="tpl__title">${esc(t.title)}</h3>
       <p class="tpl__desc">${esc(t.tagline || t.description || t.identity_statement || '')}</p>
       <button class="btn btn--solid" type="button" data-start="${esc(t.id)}">${esc(t.cta_text || 'Start this plan')}</button>
@@ -48,7 +47,7 @@ function buildModal() {
 
 function openSetup(t) {
   selected = t;
-  document.getElementById('tpl-meta').textContent = `${t.length_days} days · ${DIRECTION[t.direction] || 'Plan'}`;
+  document.getElementById('tpl-meta').textContent = `${t.length_days} days${t.category ? ' · ' + t.category : ''}`;
   document.getElementById('tpl-title').textContent = t.title;
   document.getElementById('tpl-desc').textContent = t.description || t.identity_statement || '';
   document.getElementById('tpl-error').textContent = '';

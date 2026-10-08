@@ -448,7 +448,7 @@ def list_templates():
     if length in (7, 15, 30):
         query = query.filter_by(length_days=length)
 
-    templates = query.order_by(PlanTemplate.title).all()
+    templates = query.order_by(PlanTemplate.created_at.asc()).limit(6).all()
     return jsonify([{
         "id": t.id,
         "slug": t.slug,
@@ -997,6 +997,7 @@ def create_athletic_plan():
 # ---------------------------------------------------------------------------
 
 @plans_bp.route("/<user_plan_id>/videos", methods=["POST"])
+@limiter.limit(HABIT_LOG_RATE_LIMIT)
 @login_required
 def upload_progress_video_route(user_plan_id):
     user_plan, err = _load_plan(user_plan_id)
