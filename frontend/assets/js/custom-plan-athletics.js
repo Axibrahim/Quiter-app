@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const form = $('plan-form'), errorEl = $('form-error'), submit = $('submit');
 const common = mountCommonFields($('common'));
 
-let catalog = null;       // { max_tracked, metrics, sports: [...] }
+let catalog = null;       // { max_tracked, metrics, experience_levels, diet_styles, sports: [...] }
 let sport = null;         // selected sport object
 const picked = new Set(); // catalog exercise keys
 let customExerciseCount = 0;
@@ -89,7 +89,7 @@ function addCustomRow() {
 
 $('sports').addEventListener('change', (e) => {
   sport = catalog.sports.find((s) => s.key === e.target.value);
-  if (sport) renderExercises();
+  if (sport) { renderPhases(); renderExercises(); }
 });
 $('exercises').addEventListener('change', (e) => {
   e.target.checked ? picked.add(e.target.value) : picked.delete(e.target.value);
@@ -103,7 +103,10 @@ form.addEventListener('submit', async (e) => {
   errorEl.textContent = '';
   if (!sport) { errorEl.textContent = PLAN_ERRORS.invalid_sport; return; }
 
-    const invalidCustom = customRows().find((row) => {
+  const phase = document.querySelector('input[name="phase"]:checked')?.value;
+  if (!phase) { errorEl.textContent = 'Pick your current phase.'; return; }
+
+  const invalidCustom = customRows().find((row) => {
     const input = row.querySelector('input[type="text"]');
     const length = input.value.trim().length;
     const invalid = length < 2 || length > 60;
@@ -133,7 +136,15 @@ form.addEventListener('submit', async (e) => {
   submit.disabled = true;
   submit.textContent = 'Creating…';
   try {
-    await api.post('/plans/custom-athletic', { sport: sport.key, progression_goal: goal, tracked_exercises: tracked, ...common.read() });
+    await api.post('/plans/custom-athletic', {
+      sport: sport.key,
+      progression_goal: goal,
+      tracked_exercises: tracked,
+      phase,
+      experience: $('experience').value || undefined,
+      diet: $('diet').value || undefined,
+      ...common.read(),
+    });
     window.location.href = 'dashboard.html';
   } catch (ex) {
     errorEl.textContent = PLAN_ERRORS[ex.message] || errorText(ex.message);
@@ -146,6 +157,8 @@ form.addEventListener('submit', async (e) => {
   try {
     catalog = await api.get('/plans/exercise-catalog');
     renderSports();
+    fillSelect($('experience'), catalog.experience_levels, 'Not sure');
+    fillSelect($('diet'), catalog.diet_styles, 'No preference');
   } catch (ex) {
     $('sports').innerHTML = `<span class="error">${esc(errorText(ex.message))}</span>`;
   }

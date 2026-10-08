@@ -11,34 +11,28 @@ HOW IT KEEPS TOKEN USE LOW
    every AI_STEADY_EVERY-th ordinary day). Every other day uses a rich template
    bank at zero cost. Set AI_MODE=daily to use AI every day, AI_MODE=off for none.
 2. Tiny prompts: ~50-token system prompt, one compact data line, max_tokens 80.
-3. Hard cap: AI_DAILY_CALL_LIMIT AI messages per UTC day for the whole app.
+3. Hard cap: AI_DAILY_CALL_LIMIT AI calls per UTC day for the whole app
+   (shared with the dashboard tips, see ai_client.py).
 4. Never for "ghost" plans (no check-in for 7+ days) — those get a template.
-5. Circuit breaker: after 3 provider failures in a row the AI is skipped for
-   5 minutes, so a provider outage can't slow the dashboard or burn retries.
+5. Circuit breaker (in ai_client.py): after 3 provider failures in a row the AI
+   is skipped for 5 minutes, so a provider outage can't slow the dashboard.
 6. One attempt per plan per day: the result (AI or fallback) is stored.
-Every call logs its token usage (grep "coach_ai usage") so you can see real cost.
+Every call logs its token usage (grep "ai usage") so you can see real cost.
 
-Environment
------------
-AI_API_KEY            provider key. Empty = templates only.
-AI_PROVIDER           "anthropic" (default) or "openai" (any OpenAI-compatible API)
-AI_MODEL              default: claude-haiku-4-5-20251001 / gpt-4o-mini
-AI_BASE_URL           only for OpenAI-compatible hosts other than OpenAI
-AI_MODE               "milestones" (default) | "daily" | "off"
-AI_STEADY_EVERY       in milestones mode, also use AI every N-th ordinary day (default 3, 0 = never)
-AI_DAILY_CALL_LIMIT   max AI messages per UTC day (default 300)
-AI_TIMEOUT_SECONDS    default 8
+Provider settings (AI_PROVIDER, AI_MODEL, AI_API_KEY, ...) live in ai_client.py.
+Environment used here: AI_MODE ("milestones" | "daily" | "off"), AI_STEADY_EVERY
+(in milestones mode, also use AI every N-th ordinary day; default 3, 0 = never).
 """
 import hashlib
 import logging
 import os
 import re
-from app.utils import ai_client
-from datetime import date, datetime, timezone
+from datetime import date
 
 from sqlalchemy.exc import IntegrityError
 
 from app.models.models import db, CoachMessage
+from app.utils import ai_client
 
 logger = logging.getLogger("quiter.coach_ai")
 
@@ -172,9 +166,6 @@ def wants_ai(ctx: dict) -> bool:
     return ai_client.can_use_ai()
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Output cleanup + template message
 # ---------------------------------------------------------------------------
@@ -202,7 +193,7 @@ def template_message(ctx: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Providers (compact prompt, small output)
+# AI prompt + generation (provider calls live in ai_client.py)
 # ---------------------------------------------------------------------------
 
 def _user_prompt(ctx: dict) -> str:
@@ -212,41 +203,6 @@ def _user_prompt(ctx: dict) -> str:
     return (f"<d>name={ctx['name']} goal={ctx['goal']}{extra} day={ctx['day']}/{ctx['total']} "
             f"streak={ctx['streak']} missed_days={ctx['days_since_checkin']}</d>\n"
             f"moment: {MOMENT_HINT[ctx['moment']]}; tone: {STYLE_HINT[ctx['style']]}")
-
-
-def _timeout() -> float:
-    return float(os.environ.get("AI_TIMEOUT_SECONDS", "8"))
-
-
-def _call_anthropic(api_key: str, ctx: dict):
-    resp = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-        json={"model": os.environ.get("AI_MODEL") or "claude-haiku-4-5-20251001", "max_tokens": 80,
-              "system": SYSTEM_PROMPT, "messages": [{"role": "user", "content": _user_prompt(ctx)}]},
-        timeout=_timeout(),
-    )
-    resp.raise_for_status()
-    body = resp.json()
-    usage = body.get("usage") or {}
-    logger.info("coach_ai usage in=%s out=%s", usage.get("input_tokens"), usage.get("output_tokens"))
-    return "".join(b.get("text", "") for b in body.get("content") or [] if b.get("type") == "text")
-
-
-def _call_openai_compatible(api_key: str, ctx: dict):
-    base = (os.environ.get("AI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-    resp = requests.post(
-        f"{base}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": os.environ.get("AI_MODEL") or "gpt-4o-mini", "max_tokens": 80,
-              "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": _user_prompt(ctx)}]},
-        timeout=_timeout(),
-    )
-    resp.raise_for_status()
-    body = resp.json()
-    usage = body.get("usage") or {}
-    logger.info("coach_ai usage in=%s out=%s", usage.get("prompt_tokens"), usage.get("completion_tokens"))
-    return body["choices"][0]["message"]["content"]
 
 
 def generate_message(ctx: dict):

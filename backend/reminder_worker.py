@@ -138,7 +138,7 @@ def process_due_reminders() -> int:
                     display_name=plan.user.display_name,
                     goal_text=plan.goal_text or plan.template.title,
                     days_missed=gap,
-                    days_left=max(0, plan.template.length_days - day_number),
+                    days_left=max(0, 15 - gap),
                     idempotency_key=f"comeback:{plan.id}:{local_date}",
                 )
             else:

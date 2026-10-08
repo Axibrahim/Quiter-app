@@ -112,7 +112,7 @@ function progressInsight(summary) {
 
 function insightCard(plan, analytics) {
   if (!analytics?.summary || !Array.isArray(analytics.weekly)) {
-    return `<article class="insight-plan"><h3>${esc(cleanGoal(plan))}</h3><p class="field__hint">Progress details couldn't load.</p></article>`;
+    return `<article class="insight-plan"><h3>${esc(headline(plan))}</h3><p class="field__hint">Progress details couldn't load.</p></article>`;
   }
 
   const summary = analytics.summary;
@@ -137,7 +137,7 @@ function insightCard(plan, analytics) {
 
   return `<article class="insight-plan">
     <div class="insight-plan__head">
-      <h3>${esc(cleanGoal(plan))}</h3>
+      <h3>${esc(headline(plan))}</h3>
       <span class="insight-plan__rate">${Number(summary.adherence_pct) || 0}% overall</span>
     </div>
     <p class="insight-plan__text">${esc(progressInsight(summary))}</p>

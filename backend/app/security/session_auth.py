@@ -14,19 +14,32 @@ check below, since SameSite alone doesn't cover older browsers or
 same-site-subdomain edge cases.
 """
 import functools
+import time
 from flask import session, request, jsonify, g
 
 from app.models.models import db, User
 
 
-def login_user(user: User) -> None:
+# Sessions WITHOUT "Remember me" also stop working on the server after this
+# long, so a browser that restores session cookies can't keep one alive forever.
+SHORT_SESSION_SECONDS = 12 * 60 * 60
+
+
+def login_user(user: User, remember: bool = True) -> None:
     """Establish the session. Flask signs this cookie with SECRET_KEY, so
     tampering with the cookie invalidates the signature — the session id
     itself is never trusted without that signature check, which Flask
-    performs automatically on every request."""
+    performs automatically on every request.
+
+    remember=True  -> persistent cookie that lasts PERMANENT_SESSION_LIFETIME
+                      (see app/__init__.py) and renews while you keep using the site.
+    remember=False -> browser-session cookie (gone when the browser closes) that
+                      is also rejected server-side after SHORT_SESSION_SECONDS."""
     session.clear()               # prevent session fixation across logins
     session["user_id"] = user.id
-    session.permanent = True      # respects PERMANENT_SESSION_LIFETIME in app.py
+    session["remember"] = bool(remember)
+    session["iat"] = int(time.time())
+    session.permanent = bool(remember)
 
 
 def logout_user() -> None:
@@ -42,6 +55,13 @@ def login_required(view):
         user_id = session.get("user_id")
         if not user_id:
             return jsonify({"error": "authentication_required"}), 401
+
+        # Sessions created before "Remember me" existed have no flag and are
+        # treated as remembered, so nobody gets logged out by this update.
+        if not session.get("remember", True):
+            if time.time() - session.get("iat", 0) > SHORT_SESSION_SECONDS:
+                session.clear()
+                return jsonify({"error": "authentication_required"}), 401
 
         # Belt-and-suspenders CSRF check: browsers will not let a
         # cross-site form or fetch() call set an arbitrary custom header,

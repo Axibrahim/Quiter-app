@@ -26,12 +26,28 @@
         <div class="chips" id="sports" role="radiogroup" aria-label="Sport"><span class="field__hint">Loading sports…</span></div>
       </section>
 
+      <section class="group liquid-glass liquid-glass--panel" id="phase-group" hidden>
+        <p class="group__label">2 · Current phase</p>
+        <div class="chips" id="phases" role="radiogroup" aria-label="Current phase"></div>
+        <div class="grid-2" style="margin-top:var(--space-3)">
+          <div class="field" style="margin:0">
+            <label for="experience">Experience <span class="optional">Optional</span></label>
+            <select id="experience"></select>
+          </div>
+          <div class="field" style="margin:0">
+            <label for="diet">Food style <span class="optional">Optional</span></label>
+            <select id="diet"></select>
+          </div>
+        </div>
+        <p class="field__hint" style="margin-top:.6rem">Your coach uses this to tailor tips, including food ideas.</p>
+      </section>
+
       <section class="group liquid-glass liquid-glass--panel" id="ex-group" hidden>
-        <p class="group__label">2 · Exercises to track <span class="optional" id="ex-count">0 / 8</span></p>
+        <p class="group__label">3 · Exercises to track <span class="optional" id="ex-count">0 / 8</span></p>
         <div class="chips" id="exercises"></div>
         <p class="group__label" style="margin-top:1.6rem">Something else? <span class="optional">Custom</span></p>
         <div class="pick-rows" id="custom-rows"></div>
-                <p class="field__hint custom-exercise-hint" id="custom-exercise-hint">
+        <p class="field__hint custom-exercise-hint" id="custom-exercise-hint">
           Use a clear name and choose whether to track weight, reps or another metric.
         </p>
         <button class="btn btn--glass liquid-glass btn--sm custom-exercise-add" type="button" id="add-custom">
@@ -40,7 +56,7 @@
       </section>
 
       <section class="group liquid-glass liquid-glass--panel">
-        <p class="group__label">3 · Your target</p>
+        <p class="group__label">4 · Your target</p>
         <div class="field" style="margin:0">
           <label for="goal">What do you want to reach? <span class="counter" id="goal-count">0 / 200</span></label>
           <textarea id="goal" maxlength="200" placeholder="e.g. Bench 100 kg for 5 reps, run 10 km under 50 minutes…" required></textarea>

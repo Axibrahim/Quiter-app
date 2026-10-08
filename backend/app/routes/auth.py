@@ -132,7 +132,9 @@ def login():
 
     db.session.commit()
 
-    login_user(user)
+    # "Remember me": absent -> True, so older clients keep their old behaviour.
+    remember = payload.get("remember_me") is not False
+    login_user(user, remember=remember)
     return jsonify(_public_user(user)), 200
 
 

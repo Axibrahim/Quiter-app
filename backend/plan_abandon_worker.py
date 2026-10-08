@@ -15,10 +15,13 @@ import logging
 import os
 import time
 from datetime import date, timedelta
-from app.security.email import send_plan_closed_email
+
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 from app import create_app
 from app.models.models import db, UserPlan
+from app.security.email import send_plan_closed_email
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),

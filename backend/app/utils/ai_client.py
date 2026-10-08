@@ -83,14 +83,21 @@ def _record_result(ok: bool) -> None:
 # ---------------------------------------------------------------------------
 
 def under_daily_budget() -> bool:
-    from app.models.models import CoachMessage, PlanInsight   # local import: avoids cycles
+    from app.models.models import CoachMessage, PlanInsight, db   # local import: avoids cycles
 
     limit = int(os.environ.get("AI_DAILY_CALL_LIMIT", "300"))
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-    used = (
-        CoachMessage.query.filter(CoachMessage.source == "ai", CoachMessage.created_at >= start).count()
-        + PlanInsight.query.filter(PlanInsight.source == "ai", PlanInsight.created_at >= start).count()
-    )
+    try:
+        used = (
+            CoachMessage.query.filter(CoachMessage.source == "ai", CoachMessage.created_at >= start).count()
+            + PlanInsight.query.filter(PlanInsight.source == "ai", PlanInsight.created_at >= start).count()
+        )
+    except Exception:
+        # e.g. the plan_insights table has not been created yet. Fail closed: no AI,
+        # free fallbacks are used, and the request never turns into a 500.
+        db.session.rollback()
+        logger.exception("ai: daily budget check failed; AI disabled for this call")
+        return False
     return used < limit
 
 

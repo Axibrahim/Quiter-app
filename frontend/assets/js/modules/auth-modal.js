@@ -19,8 +19,11 @@ const TEMPLATE = `
     <form id="auth-form" novalidate>
       <div class="field" id="f-name"><label for="a-name">Name</label><input id="a-name" type="text" autocomplete="name" maxlength="40" placeholder="What should we call you?"></div>
       <div class="field"><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" placeholder="you@email.com" required></div>
-      <div class="field" id="f-pass"><label for="a-pass">Password</label><input id="a-pass" type="password" autocomplete="current-password" placeholder="••••••••••" required>
-        <a href="#" class="modal__link" id="a-forgot">Forgot password?</a></div>
+      <div class="field" id="f-pass"><label for="a-pass">Password</label><input id="a-pass" type="password" autocomplete="current-password" placeholder="••••••••••" required></div>
+      <div class="modal__row" id="a-row">
+        <label class="q-check q-check--sm"><input type="checkbox" id="a-remember" checked><span class="q-check__box"></span><span class="q-check__label">Remember me</span></label>
+        <a href="#" class="modal__link" id="a-forgot">Forgot password?</a>
+      </div>
       <p class="error" id="a-error" role="alert"></p>
       <p class="success" id="a-ok" role="status"></p>
       <button class="btn btn--solid modal__submit" type="submit" id="a-submit"></button>
@@ -42,7 +45,7 @@ function setMode(m) {
   overlay.querySelector('#a-submit').textContent = c.btn;
   overlay.querySelector('#f-name').hidden = m !== 'signup';
   overlay.querySelector('#f-pass').hidden = m === 'forgot';
-  overlay.querySelector('#a-forgot').hidden = m !== 'login';
+  overlay.querySelector('#a-row').hidden = m !== 'login';   // Remember me + Forgot password: sign-in only
   overlay.querySelector('#auth-tabs').hidden = m === 'forgot';
   overlay.querySelector('#a-pass').autocomplete = m === 'signup' ? 'new-password' : 'current-password';
   overlay.querySelectorAll('.modal__tab').forEach((t) => t.classList.toggle('is-active', t.dataset.mode === m));
@@ -83,7 +86,7 @@ async function submit(e) {
       await api.post('/auth/register', { email, password, display_name: name });
       window.location.href = nextUrl || 'plans.html';
     } else {
-      await api.post('/auth/login', { email, password });
+      await api.post('/auth/login', { email, password, remember_me: overlay.querySelector('#a-remember').checked });
       window.location.href = nextUrl || 'dashboard.html';
     }
   } catch (ex) {

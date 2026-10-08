@@ -51,7 +51,9 @@ def create_app(config_name: str = "production") -> Flask:
             "pool_pre_ping": True,   # avoids "server closed the connection" errors after DB idle timeouts
             "pool_recycle": 280,
         }
-    app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 14  # 14-day rolling session
+    # How long a "Remember me" session lasts (renews while the user keeps using the site).
+    # Sessions without "Remember me" are browser-session cookies (see security/session_auth.py).
+    app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * int(os.environ.get("SESSION_REMEMBER_DAYS", "30"))
 
     if config_name == "testing":
         app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(

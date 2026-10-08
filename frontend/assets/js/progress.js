@@ -45,6 +45,7 @@ export async function initProgress() {
     $('p-kind').textContent = p.plan_type === 'athletic'
       ? ['Athlete plan', p.athletic?.sport_label, p.athletic?.phase_label?.split('—')[0].trim()].filter(Boolean).join(' · ')
       : 'Personal plan';
+    const sportLabel = p.athletic?.sport_label;
     const cleaned = sportLabel && p.goal_text.startsWith(`${sportLabel} — `) ? p.goal_text.slice(sportLabel.length + 3) : p.goal_text;
     $('p-title').textContent = p.plan_type !== 'catalog' && p.title && p.title !== p.goal_text ? p.title : cleaned;
     $('s-day').textContent = `${p.day_number}/${p.total_days}`;
@@ -66,7 +67,7 @@ export async function initProgress() {
       exit.textContent = 'Tap again to exit';
       setTimeout(() => {
         exit.classList.remove('is-confirming');
-        exit.textContent = 'Exit this plan';
+        exit.textContent = 'Exit plan';
       }, 4000);
       return;
     }
@@ -80,7 +81,7 @@ export async function initProgress() {
       err.textContent = errorText(ex.message);
       exit.disabled = false;
       exit.classList.remove('is-confirming');
-      exit.textContent = 'Exit this plan';
+      exit.textContent = 'Exit plan';
     }
   });
 
