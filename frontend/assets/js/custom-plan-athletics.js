@@ -98,6 +98,48 @@ $('exercises').addEventListener('change', (e) => {
 $('add-custom').addEventListener('click', addCustomRow);
 $('goal').addEventListener('input', () => { $('goal-count').textContent = `${$('goal').value.length} / 200`; });
 
+
+// ---- AI placeholder for "What do you want to reach?" ------------------------
+// Re-asks (debounced) whenever an earlier answer changes. Only runs while the box
+// is still empty, so it never costs tokens once the user starts typing.
+const goalEl = $('goal');
+const DEFAULT_GOAL_HINT = goalEl.placeholder;
+let hintTimer = null, hintSeq = 0;
+
+const currentPhase = () => document.querySelector('input[name="phase"]:checked')?.value;
+
+function scheduleGoalHint() {
+  clearTimeout(hintTimer);
+  if (!sport || !currentPhase() || goalEl.value.trim()) return;
+  hintTimer = setTimeout(fetchGoalHint, 900);
+}
+
+async function fetchGoalHint() {
+  const seq = ++hintSeq;
+  const tracked = [
+    ...[...picked].map((key) => ({ key })),
+    ...customRows()
+      .map((r) => ({ label: r.querySelector('input').value.trim(), metric: r.querySelector('select').value }))
+      .filter((c) => c.label.length >= 2),
+  ];
+  try {
+    const res = await api.post('/plans/goal-placeholder', {
+      sport: sport.key,
+      phase: currentPhase(),
+      experience: $('experience').value || undefined,
+      diet: $('diet').value || undefined,
+      tracked_exercises: tracked,
+    });
+    if (seq === hintSeq && res?.placeholder && !goalEl.value.trim()) goalEl.placeholder = res.placeholder;
+  } catch { /* keep the current placeholder */ }
+}
+
+$('sports').addEventListener('change', () => { goalEl.placeholder = DEFAULT_GOAL_HINT; });
+['sports', 'phases', 'exercises', 'custom-rows'].forEach((id) => $(id).addEventListener('change', scheduleGoalHint));
+$('custom-rows').addEventListener('click', scheduleGoalHint);   // "Remove" buttons
+$('experience').addEventListener('change', scheduleGoalHint);
+$('diet').addEventListener('change', scheduleGoalHint);
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorEl.textContent = '';

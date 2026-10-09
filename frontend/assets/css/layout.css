@@ -660,3 +660,60 @@ html { -webkit-text-size-adjust: 100%; }
 .q-check--sm .q-check__box { width: 22px; height: 22px; }
 .q-check--sm .q-check__box::after { width: 5px; height: 10px; border-width: 0 2px 2px 0; }
 .q-check--sm .q-check__label { font-size: .88rem; font-weight: 400; color: var(--ink-70); }
+
+/* ==== Dashboard polish v2 (from the Figma design) ==== */
+.page--dash .wrap { max-width: 1160px; }
+
+/* two-column plan panel: content left, last-7-days chart right */
+.plan { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 var(--space-4); align-items: start;
+  transition: box-shadow .5s, transform .5s var(--ease-out, cubic-bezier(.22,1,.36,1)); }
+.plan:not(:has(.plan__side)) { grid-template-columns: minmax(0, 1fr); }
+.plan__main { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.plan:hover:not(.is-done) { transform: translateY(-3px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.18), 0 24px 60px rgba(0,0,0,.45), 0 0 50px rgba(141,124,255,.12); }
+
+.week { padding: 1.25rem; border-radius: var(--radius-md); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); }
+.week__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
+  font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-50); }
+.week__head b { font: 400 .8rem var(--font-mono); letter-spacing: 0; color: var(--accent-teal); }
+.week__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: .6rem; height: 7.5rem; }
+.week__day { display: grid; grid-template-rows: 1fr auto; gap: .4rem; justify-items: center; min-width: 0; }
+.week__bar { align-self: end; width: 100%; max-width: 26px; height: 16%; border-radius: 8px; background: rgba(255,255,255,.1);
+  transition: height .8s var(--ease-out, cubic-bezier(.22,1,.36,1)), transform .3s var(--ease-out, cubic-bezier(.22,1,.36,1)); }
+.week__day.is-done .week__bar { height: 100%; background: linear-gradient(180deg, var(--accent-teal), var(--accent-violet)); box-shadow: 0 0 18px rgba(63,232,201,.18); }
+.week__day.is-partial .week__bar { height: 60%; background: linear-gradient(180deg, rgba(63,232,201,.7), rgba(141,124,255,.5)); }
+.week__day.is-missed .week__bar { height: 34%; background: rgba(255,107,74,.55); }
+.week__day:hover .week__bar { transform: translateY(-3px); }
+.week__label { font: .68rem var(--font-mono); color: var(--ink-40); }
+
+/* progress meter: violet to teal with a slow sheen */
+.meter { height: 8px; }
+.meter > i { position: relative; overflow: hidden; background: linear-gradient(90deg, var(--accent-violet), var(--accent-teal)); }
+.meter > i::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: q-sheen 3s var(--ease-out, cubic-bezier(.22,1,.36,1)) infinite; }
+@keyframes q-sheen { 60%, 100% { transform: translateX(100%); } }
+
+/* stats + coach box */
+.plan__stats { align-items: baseline; gap: 1.75rem; }
+.plan__stats b { margin-left: .35rem; font-family: var(--font-sans, 'Inter', sans-serif); font-size: 1.25rem; font-weight: 600; }
+.coach { border: 1px solid rgba(255,255,255,.12); border-left: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); }
+.coach__label { color: var(--accent-teal); }
+.coach__text { color: var(--ink-70); }
+
+/* insight cards become glass tiles */
+.dashboard-insights__list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+.insight-plan, .insight-plan:first-child { padding: 1.1rem 1.25rem; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(255,255,255,.04);
+  transition: transform .4s var(--ease-out, cubic-bezier(.22,1,.36,1)), background .3s, border-color .3s; }
+.insight-plan:hover { transform: translateY(-3px); background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.2); }
+.insight-chart__track span { background: linear-gradient(180deg, var(--accent-teal), var(--accent-violet)); }
+
+/* plans page: template cards lift and glow on hover */
+.js .tpl { transition: opacity .8s var(--ease-out, cubic-bezier(.22,1,.36,1)), transform .5s var(--ease-out, cubic-bezier(.22,1,.36,1)), box-shadow .5s; }
+.js .tpl:hover { transform: translateY(-6px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.2), 0 28px 70px rgba(0,0,0,.5), 0 0 60px rgba(141,124,255,.18); }
+
+@media (max-width: 860px) {
+  .plan { grid-template-columns: minmax(0, 1fr); }
+  .plan__side { margin-top: var(--space-2); }
+}

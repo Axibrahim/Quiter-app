@@ -9,8 +9,9 @@
  *       'none'      -> don't even check the session (verify / reset / email check-in)
  */
 import { initBackground } from '../bg-video.js';
-import { loadUser, logout } from './auth-state.js';
+import { loadUser } from './auth-state.js';
 import { initAuthModal, openAuthModal } from './auth-modal.js';
+
 
 const MARK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 13v9M12 7V2M9 10H4M20 10h-5M9.9 7.9 6.5 4.5M17.5 4.5l-3.4 3.4"/></svg>`;
 
@@ -26,8 +27,7 @@ function renderNav(user, active) {
 
   const right = user
     ? `${user.is_admin ? '<a class="btn btn--text btn--sm" href="admin.html">Admin</a>' : ''}
-       <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${(user.display_name || 'Me').split(' ')[0]}</a>
-       <button class="btn btn--text btn--sm" type="button" id="nav-logout">Log out</button>`
+       <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${(user.display_name || 'Me').split(' ')[0]}</a>`
     : `<button class="btn btn--text btn--sm" type="button" data-open-auth="login">Log in</button>
        <button class="btn btn--solid btn--sm" type="button" data-open-auth="signup">Get started</button>`;
 
@@ -53,7 +53,6 @@ function renderNav(user, active) {
     toggle.setAttribute('aria-expanded', String(open));
   });
   panel.addEventListener('click', (e) => { if (e.target.closest('a')) panel.classList.remove('is-open'); });
-  nav.querySelector('#nav-logout')?.addEventListener('click', logout);
 }
 
 function initReveal() {

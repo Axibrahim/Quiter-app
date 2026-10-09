@@ -25,13 +25,14 @@ from app.data.exercise_catalog import (
     CATALOG, METRICS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
     EXPERIENCE_LEVELS, DIET_STYLES, find_phase, phases_for,
 )
-from app.utils.plan_ai import suggest_plan_name, get_or_create_insight
+from app.utils.plan_ai import suggest_plan_name
+from app.utils.blue_ai import get_or_create_suggestions
 from app.security.email import (
     send_plan_started_email, send_plan_completed_email,
     send_plan_closed_email, send_streak_milestone_email,
 )
 from app.utils.analytics import build_analytics
-from app.utils.coach_ai import get_or_create_coach_message, get_existing_coach_message
+from app.utils.plan_ai import suggest_plan_name, get_or_create_insight, suggest_goal_placeholder
 from app.security.checkin_tokens import read_checkin_token
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
@@ -49,6 +50,7 @@ MAX_ACTIVE_PLANS = 3
 AUTO_QUIT_DAYS = 15
 VIDEO_FREQUENCIES = {"weekly", "monthly", None}
 COACH_MESSAGE_RATE_LIMIT = "30 per hour"
+GOAL_HINT_RATE_LIMIT = "30 per hour"
 
 
 # ---------------------------------------------------------------------------
@@ -481,6 +483,41 @@ def get_exercise_catalog():
             for key, sport in CATALOG.items()
         ],
     }), 200
+
+
+@plans_bp.route("/goal-placeholder", methods=["POST"])
+@limiter.limit(GOAL_HINT_RATE_LIMIT)
+@login_required
+def goal_placeholder():
+    """AI-written example for the 'What do you want to reach?' box, based on the
+    answers so far (sport, phase, level, food style, exercises, and the user's
+    optional 'about me'). Falls back to a free heuristic. Never fails the form."""
+    payload = request.get_json(silent=True) or {}
+    sport = payload.get("sport")
+    if not sport_exists(sport):
+        return jsonify({"error": "invalid_sport"}), 400
+
+    phase = find_phase(sport, payload.get("phase")) if payload.get("phase") else None
+    experience = EXPERIENCE_LEVELS.get(payload.get("experience") or "", "")
+    diet = DIET_STYLES.get(payload.get("diet") or "", "")
+
+    labels = []
+    raw = payload.get("tracked_exercises")
+    if isinstance(raw, list):
+        for item in raw[:MAX_TRACKED_EXERCISES]:
+            if not isinstance(item, dict):
+                continue
+            if item.get("key") is not None:
+                entry = find_exercise(sport, item.get("key"))
+                if entry:
+                    labels.append(entry["label"])
+            elif isinstance(item.get("label"), str) and 2 <= len(item["label"].strip()) <= 60:
+                labels.append(item["label"].strip())
+
+    text, source = suggest_goal_placeholder(
+        CATALOG[sport]["label"], phase, experience, diet, labels, g.current_user.about_me or "",
+    )
+    return jsonify({"placeholder": text, "source": source}), 200
 
 
 @plans_bp.route("/adopt", methods=["POST"])
@@ -1086,22 +1123,22 @@ def get_coach_message(user_plan_id):
     row = get_or_create_coach_message(user_plan, today)
     return jsonify({"message": row.body, "source": row.source, "date": today.isoformat()}), 200
 
-
-@plans_bp.route("/<user_plan_id>/insights", methods=["GET"])
+@plans_bp.route("/<user_plan_id>/blue", methods=["GET"])
+@plans_bp.route("/<user_plan_id>/insights", methods=["GET"])   # old path kept so nothing breaks
 @limiter.limit(COACH_MESSAGE_RATE_LIMIT)
 @login_required
-def get_insights(user_plan_id):
-    """This week's personalised tips (food / training / recovery for athletes).
-    Cached per plan per week, so most calls cost zero AI tokens."""
+def get_blue_suggestions(user_plan_id):
+    """Blue's suggestions (max 3) for this plan, based on the user's inputs and
+    real progress. Cached per plan per day + progress state, so most calls
+    cost zero AI tokens."""
     user_plan, err = _load_plan(user_plan_id)
     if err:
         return err
     if user_plan.is_completed or user_plan.is_abandoned:
         return jsonify({"tips": []}), 200
-
-    row = get_or_create_insight(user_plan, _local_today(user_plan))
+ 
+    row = get_or_create_suggestions(user_plan, _local_today(user_plan))
     return jsonify({"tips": row.tips, "source": row.source}), 200
-
 
 @plans_bp.route("/email-checkin", methods=["POST"])
 @limiter.limit(HABIT_LOG_RATE_LIMIT)

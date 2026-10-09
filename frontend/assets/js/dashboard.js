@@ -1,7 +1,8 @@
 /**
  * Dashboard: one glass card per plan.
+ *  - Blue's suggestions (up to 3, based on your progress) sit right under the plan name
  *  - the circle checkbox marks today complete (athletes: saves their numbers too)
- *  - the coach message loads per plan (AI when configured, templates otherwise)
+ *  - Blue's daily message loads per plan (AI when configured, templates otherwise)
  *  - "I missed today" needs a second tap to confirm (it resets the streak)
  */
 import { api, errorText } from './modules/api-client.js';
@@ -17,11 +18,21 @@ const cleanGoal = (p) => (p.sport_label && p.goal_text.startsWith(`${p.sport_lab
 // AI-written plan name when there is one; older plans fall back to the goal text.
 const headline = (p) => (p.plan_type !== 'catalog' && p.title && p.title !== p.goal_text ? p.title : cleanGoal(p));
 const phaseShort = (p) => (p.phase_label ? p.phase_label.split('—')[0].trim() : '');
-const TIP_LABEL = { food: 'Food', train: 'Training', recovery: 'Recovery', habit: 'Habit', focus: 'Focus' };
+// Short chip text for each kind of suggestion Blue can give.
+const TIP_LABEL = {
+  food: 'Food', train: 'Training', recovery: 'Recovery', habit: 'Habit', focus: 'Focus',
+  craving: 'Cravings', swap: 'Swap', routine: 'Routine', social: 'People', body: 'Body', mindset: 'Mindset',
+};
 
+// Blue's suggestions. p.tips === undefined means "not loaded yet" (shimmer); [] means "nothing to show".
 function tipsHtml(p) {
-  if (p.is_completed || !p.tips?.length) return '';
-  return `<div class="tips"><p class="tips__label">Picked for you</p><ul class="tips__list">${p.tips.map((t) =>
+  if (p.is_completed || p.is_abandoned) return '';
+  if (!p.tips) {
+    return `<div class="tips is-loading" aria-busy="true"><p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue is reading your progress…</p>
+      <ul class="tips__list" aria-hidden="true"><li></li><li></li><li></li></ul></div>`;
+  }
+  if (!p.tips.length) return '';
+  return `<div class="tips"><p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue suggests</p><ul class="tips__list">${p.tips.map((t) =>
     `<li class="tip"><span class="tip__kind tip__kind--${esc(t.k)}">${esc(TIP_LABEL[t.k] || 'Tip')}</span><span class="tip__text">${esc(t.t)}</span></li>`).join('')}</ul></div>`;
 }
 
@@ -42,7 +53,7 @@ function cardHtml(p) {
   const done = p.already_logged_today || p.is_completed;
   const coach = p.is_completed ? '' : `
     <div class="coach ${p.coach_message ? '' : 'is-loading'}" data-coach>
-      <p class="coach__label">Your coach</p><p class="coach__text">${esc(p.coach_message || 'Writing today’s message…')}</p></div>`;
+      <p class="coach__label">Blue</p><p class="coach__text">${esc(p.coach_message || 'Blue is writing today’s message…')}</p></div>`;
 
   const checkLabel = p.is_completed ? 'Plan complete' : done ? 'Marked as on track' : "Yes, I'm on track today";
   const video = p.video_checkin_frequency && !p.is_completed
@@ -52,12 +63,12 @@ function cardHtml(p) {
   <article class="plan liquid-glass liquid-glass--panel ${done ? 'is-done' : ''}" data-id="${esc(p.user_plan_id)}">
     <div class="plan__top"><span class="badge ${athlete ? 'badge--athlete' : ''}">${athlete ? esc(p.sport_label || 'Athlete') : 'Personal'}</span>
       <span class="plan__day">Day ${p.day_number} of ${p.total_days}</span></div>
-        <h2 class="plan__title">${esc(headline(p))}</h2>
+    <h2 class="plan__title">${esc(headline(p))}</h2>
     ${(phaseShort(p) || headline(p) !== cleanGoal(p)) ? `<p class="plan__sub">${esc([phaseShort(p), cleanGoal(p)].filter((x) => x && x !== headline(p)).join(' · '))}</p>` : ''}
+    <div data-tips>${tipsHtml(p)}</div>
     <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
     <div class="plan__stats"><span>Streak <b>${p.current_streak}</b></span><span>Best <b>${p.longest_streak}</b></span></div>
     ${coach}
-    <div data-tips>${tipsHtml(p)}</div>
     ${!p.is_completed && p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
     ${!p.is_completed && p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
     ${exerciseInputs(p)}
@@ -80,7 +91,7 @@ function render() {
   document.getElementById('new-plan').hidden = active >= MAX_PLANS;
   if (!plans.length) {
     listEl.innerHTML = `<div class="empty liquid-glass liquid-glass--panel"><h2 class="h3">No plan yet</h2>
-      <p>Pick athlete or personal coaching and your coach will take it from there.</p>
+      <p>Pick athlete or personal coaching and Blue will take it from there.</p>
       <a class="btn btn--solid" href="plans.html">Build my first plan</a></div>`;
     return;
   }
@@ -195,12 +206,21 @@ async function loadCoachMessages() {
   }));
 }
 
+// Blue's suggestions for every plan that doesn't have them yet (p.tips is undefined).
 async function loadTips() {
   await Promise.all(plans.filter((p) => !p.tips && !p.is_completed && !p.is_abandoned).map(async (p) => {
-    try { p.tips = (await api.get(`/plans/${p.user_plan_id}/insights`)).tips || []; } catch { p.tips = []; }
+    try { p.tips = (await api.get(`/plans/${p.user_plan_id}/blue`)).tips || []; } catch { p.tips = []; }
     const box = listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"] [data-tips]`);
     if (box) box.innerHTML = tipsHtml(p);
   }));
+}
+
+// Progress changed (check-in / missed day): re-render the card and ask Blue again.
+function refreshAfterProgress(p) {
+  p.tips = undefined;
+  replaceCard(p);
+  loadTips();
+  loadDashboardInsights();
 }
 
 async function complete(card, p) {
@@ -226,8 +246,7 @@ listEl.addEventListener('change', async (e) => {
   box.disabled = true;
   try {
     await complete(card, p);
-    replaceCard(p);
-    loadDashboardInsights();
+    refreshAfterProgress(p);
   } catch (ex) {
     box.checked = false; box.disabled = false;
     if (ex.message === 'already_logged_today') { p.already_logged_today = true; replaceCard(p); return; }
@@ -283,8 +302,7 @@ listEl.addEventListener('click', async (e) => {
     try {
       const r = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'missed' });
       p.already_logged_today = true; p.current_streak = r.current_streak ?? 0;
-      replaceCard(p);
-      loadDashboardInsights();
+      refreshAfterProgress(p);
     } catch (ex) { err.textContent = errorText(ex.message); }
   }
 });

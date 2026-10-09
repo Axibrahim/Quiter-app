@@ -73,6 +73,7 @@ class User(db.Model):
     # never the email, in any API response.
     display_name = Column(String(40), nullable=False)
     avatar_seed = Column(String(64), nullable=False, default=gen_uuid)
+    about_me = Column(String(200), nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
     is_verified = Column(Boolean, nullable=False, default=False)

@@ -36,6 +36,7 @@ def _public_user(user: User) -> dict:
         "display_name": user.display_name,
         "is_verified": user.is_verified,
         "is_admin": user.is_admin,
+        "about_me": user.about_me or "",
     }
 
 
@@ -259,6 +260,27 @@ def verify_confirm():
 
     send_welcome_email(user.email, user.display_name)
     return jsonify({"ok": True}), 200
+
+
+@auth_bp.route("/about", methods=["PATCH"])
+@login_required
+def update_about():
+    """Save the optional 'about you' text (max 200 chars). No password needed."""
+    payload = request.get_json(silent=True) or {}
+    about = payload.get("about_me")
+    if about is None:
+        about = ""
+    if not isinstance(about, str):
+        return jsonify({"error": "invalid_about"}), 400
+
+    about = " ".join(about.split())                      # collapse newlines / spaces
+    about = "".join(ch for ch in about if ch.isprintable())
+    if len(about) > 200:
+        return jsonify({"error": "about_too_long"}), 400
+
+    g.current_user.about_me = about or None
+    db.session.commit()
+    return jsonify(_public_user(g.current_user)), 200
 
 
 @auth_bp.route("/verify/resend", methods=["POST"])

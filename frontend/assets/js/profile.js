@@ -1,10 +1,33 @@
 import { api, errorText } from './modules/api-client.js';
+import { logout } from './modules/auth-state.js';
 
 const $ = (id) => document.getElementById(id);
 
 export function initProfile(user) {
   $('p-name').value = user.display_name;
   $('p-email').value = user.email;
+
+  // Optional "about you" (max 200 chars) — read by the coach and AI tips.
+  const about = $('p-about');
+  const countAbout = () => { $('p-about-count').textContent = `${about.value.length} / 200`; };
+  about.value = user.about_me || '';
+  countAbout();
+  about.addEventListener('input', countAbout);
+  $('about-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('a-error').textContent = ''; $('a-success').textContent = '';
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      const saved = await api.patch('/auth/about', { about_me: about.value.trim() });
+      user.about_me = saved.about_me;
+      $('a-success').textContent = 'Saved.';
+    } catch (ex) {
+      $('a-error').textContent = errorText(ex.message);
+    } finally { btn.disabled = false; }
+  });
+
+  $('logout-btn').addEventListener('click', logout);
 
   if (!user.is_verified) {
     $('verify-banner').hidden = false;
