@@ -15,6 +15,7 @@
 <main class="page page--tiny">
   <div class="wrap">
     <div class="page-head"><p class="eyebrow">Account</p><h1 class="h2">Your <em>profile</em></h1></div>
+
     <div class="group liquid-glass liquid-glass--panel">
       <div class="warning" id="verify-banner" hidden style="justify-content:space-between;align-items:center">
         <p>Your email isn't verified yet.</p>
@@ -29,6 +30,23 @@
         <p class="success" id="p-success" role="status"></p>
         <button class="btn btn--solid" type="submit" style="width:100%">Save changes</button>
       </form>
+    </div>
+
+    <div class="group liquid-glass liquid-glass--panel">
+      <form id="about-form" novalidate>
+        <div class="field">
+          <label for="p-about">About you <span class="optional">Optional</span> <span class="counter" id="p-about-count">0 / 200</span></label>
+          <textarea id="p-about" maxlength="200" placeholder="e.g. 28, long work shifts, I train after work and prefer short sessions…"></textarea>
+          <p class="field__hint">Your coach reads this to make tips and messages fit you. Nobody else sees it. Skip anything you'd rather keep private.</p>
+        </div>
+        <p class="error" id="a-error" role="alert"></p>
+        <p class="success" id="a-success" role="status"></p>
+        <button class="btn btn--glass liquid-glass" type="submit" style="width:100%">Save about me</button>
+      </form>
+    </div>
+
+    <div style="margin-top:var(--space-3)">
+      <button class="btn btn--glass liquid-glass" type="button" id="logout-btn" style="width:100%">Log out</button>
     </div>
   </div>
 </main>

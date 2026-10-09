@@ -17,7 +17,6 @@
     <a class="back" href="dashboard.html">← Dashboard</a>
     <div class="progress-head" style="margin-top:1rem">
       <div><p class="eyebrow" id="p-kind"></p><h1 class="h2" id="p-title">Progress</h1></div>
-<button class="btn btn--exit" type="button" id="exit-btn" aria-live="polite" aria-atomic="true" hidden>Exit plan</button>
     </div>
     <p class="error" id="p-error" role="alert"></p>
 
@@ -50,7 +49,7 @@
       <div class="ex-cards" id="ex-cards"></div>
     </section>
 
-    <section class="panel liquid-glass liquid-glass--panel" id="video">
+    <section class="panel liquid-glass liquid-glass--panel" id="video" hidden>
       <div class="panel__head">
         <h2 class="panel__title">10-second video check-ins <span class="optional">Optional</span></h2>
         <div class="seg" role="radiogroup" aria-label="Video check-in frequency" id="video-seg">
@@ -70,6 +69,10 @@
       <p class="error" id="video-error" role="alert"></p>
       <div class="gallery" id="gallery"></div>
     </section>
+
+    <div style="margin-top:var(--space-3)">
+      <button class="btn btn--exit" type="button" id="exit-btn" aria-live="polite" aria-atomic="true" style="width:100%" hidden>Exit plan</button>
+    </div>
   </div>
 </main>
 <script type="module">

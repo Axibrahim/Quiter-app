@@ -81,9 +81,22 @@ export function initVideoCheckins(planId, frequency) {
     if (!freq) cancelRecording();
     renderGallery(videos, !!freq);
   };
+  let firstLoad = true;
+  
   const refresh = async () => {
     try { videos = await api.get(`/plans/${planId}/videos`); } catch { videos = []; $('video-error').textContent = "Couldn't load your videos."; }
     apply();
+    if (firstLoad) {
+      firstLoad = false;
+      if (freq) {
+        $('video').hidden = false;                 // video check-ins are on: show the block
+      } else {
+        // Turned off when the plan was set up: no recorder, no switch.
+        // Only show the block if there are clips saved earlier.
+        $('video-seg').hidden = true;
+        $('video').hidden = !videos.length;
+      }
+    }
   };
 
   radios.forEach((r) => r.addEventListener('change', async () => {

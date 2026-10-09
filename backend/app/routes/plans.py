@@ -32,6 +32,7 @@ from app.security.email import (
     send_plan_closed_email, send_streak_milestone_email,
 )
 from app.utils.analytics import build_analytics
+from app.utils.coach_ai import get_or_create_coach_message, get_existing_coach_message
 from app.utils.plan_ai import suggest_plan_name, get_or_create_insight, suggest_goal_placeholder
 from app.security.checkin_tokens import read_checkin_token
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
