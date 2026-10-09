@@ -13,6 +13,8 @@ import logging
 import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+from app.utils.forecast import consistency_forecast, exercise_forecasts
+from app.utils.blue_forecast import get_verdict
 
 from flask import Blueprint, request, jsonify, g
 from sqlalchemy.exc import IntegrityError
@@ -1239,6 +1241,42 @@ def set_video_frequency(user_plan_id):
 # ---------------------------------------------------------------------------
 # Coach message + weekly tips (dashboard) + one-tap email check-in
 # ---------------------------------------------------------------------------
+
+@plans_bp.route("/<user_plan_id>/forecast", methods=["GET"])
+@limiter.limit(COACH_MESSAGE_RATE_LIMIT)
+@login_required
+def get_forecast(user_plan_id):
+    """Dashboard graph: days the user marked + Blue's prediction toward the goal."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
+
+    today = _local_today(user_plan)
+    start, length = user_plan.start_date, user_plan.template.length_days
+    logs = DailyLog.query.filter_by(user_plan_id=user_plan.id).all()
+    status_by_date = {log.log_date: log.status.value for log in logs}
+
+    consistency = consistency_forecast(
+        start, today, length, status_by_date,
+        lambda d: _is_off(user_plan, d), is_completed=user_plan.is_completed,
+    )
+
+    exercises = None
+    tracked = _tracked_exercises(user_plan)
+    if tracked:
+        points = {}
+        rows = (ExerciseLog.query.filter_by(user_plan_id=user_plan.id)
+                .order_by(ExerciseLog.log_date.asc()).all())
+        for row in rows:
+            points.setdefault(row.exercise_key, []).append((row.log_date, row.value))
+        meta = user_plan.athletic_metadata or {}
+        exercises = exercise_forecasts(
+            start, length, tracked, points, meta.get("progression_goal") or user_plan.goal_text or "")
+
+    text, source = get_verdict(user_plan, today, consistency, exercises)
+    return jsonify({"consistency": consistency, "exercises": exercises,
+                    "blue": {"text": text, "source": source}}), 200
+
 
 @plans_bp.route("/<user_plan_id>/coach-message", methods=["GET"])
 @limiter.limit(COACH_MESSAGE_RATE_LIMIT)

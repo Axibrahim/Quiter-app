@@ -990,3 +990,255 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 .install-hint__text strong { color: var(--ink); font-weight: 600; font-size: .95rem; }
 .is-offline > :not(.offline-notice) { display: none; }
 .offline-notice { max-width: 560px; margin: 7rem auto 1.5rem; padding: var(--space-3); border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; position: relative; z-index: 2; }
+
+
+/* ==== Dashboard: goal forecast graph ==== */
+.dashboard-insights__list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); }
+.fc { display: flex; flex-direction: column; gap: .8rem; }
+.fc__head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.fc__pill { padding: .25rem .65rem; border-radius: var(--radius-full); background: rgba(255,255,255,.1); color: var(--ink-70);
+  font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+.fc__pill--good { color: var(--accent-teal); background: rgba(63,232,201,.12); }
+.fc__pill--warn { color: var(--accent-gold); background: rgba(248,191,64,.12); }
+.fc__pill--risk { color: var(--accent-ember); background: rgba(255,107,74,.14); }
+
+.fc__blue { display: flex; gap: .6rem; align-items: baseline; margin: 0; max-width: none; color: var(--ink); font-size: .95rem; line-height: 1.55; }
+.fc__blue b { margin-right: .25rem; color: var(--accent-violet); font-weight: 600; }
+.fc__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-violet); box-shadow: 0 0 10px var(--accent-violet); }
+
+.fc__tabs { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; }
+.fc__tabs::-webkit-scrollbar { display: none; }
+.fc__tab { flex: none; padding: .4rem .85rem; border-radius: var(--radius-full); border: 1px solid var(--line);
+  background: rgba(255,255,255,.06); color: var(--ink-70); font-size: .8rem; transition: all .2s; }
+.fc__tab:hover { color: var(--ink); background: rgba(255,255,255,.12); }
+.fc__tab.is-on { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+
+.fc__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fc__axes line { stroke: rgba(255,255,255,.08); }
+.fc__axes text { fill: var(--ink-40); font: 10px var(--font-mono); }
+.fc__ideal { fill: none; stroke: rgba(255,255,255,.3); stroke-width: 1.4; stroke-dasharray: 2 4; }
+.fc__area { fill: rgba(63,232,201,.1); stroke: none; }
+.fc__actual { fill: none; stroke: var(--accent-teal); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: fc-draw 1.2s var(--ease-out) .1s forwards; }
+@keyframes fc-draw { to { stroke-dashoffset: 0; } }
+.fc__proj { fill: none; stroke: var(--accent-violet); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 6 5; }
+.fc__band { fill: rgba(141,124,255,.16); stroke: none; }
+.fc__goal { stroke: var(--accent-gold); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: .7; }
+.fc__goal-t { fill: var(--accent-gold); font: 10px var(--font-mono); }
+.fc__today { stroke: rgba(255,255,255,.3); stroke-width: 1; }
+.fc__end { fill: var(--accent-violet); stroke: #fff; stroke-width: 1.5; }
+.fc__end-t { fill: var(--ink); font: 11px var(--font-mono); }
+.fc__pt--done { fill: var(--accent-teal); stroke: #06130f; stroke-width: 1; }
+.fc__pt--missed { fill: var(--accent-ember); }
+.fc__pt--off { fill: var(--accent-gold); }
+.fc__pt--partial, .fc__pt--none { fill: none; stroke: var(--ink-50); stroke-width: 1.5; }
+
+.fc__strip { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; }
+.fc__cell { height: 10px; border-radius: 3px; background: rgba(255,255,255,.06); }
+.fc__cell--done { background: linear-gradient(180deg, var(--accent-teal), var(--accent-violet)); }
+.fc__cell--missed { background: rgba(255,107,74,.65); }
+.fc__cell--off { background: rgba(248,191,64,.55); }
+.fc__cell--partial { background: rgba(63,232,201,.4); }
+.fc__cell--none { background: rgba(255,255,255,.2); }
+.fc__cell--today { background: rgba(255,255,255,.12); outline: 1.5px solid #fff; outline-offset: 1px; }
+
+.fc__legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; list-style: none; font-size: .74rem; color: var(--ink-50); }
+.fc__legend li { display: flex; align-items: center; gap: .4rem; }
+.fc__sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.fc__sw--done { background: var(--accent-teal); }
+.fc__sw--missed { background: var(--accent-ember); }
+.fc__sw--off { background: var(--accent-gold); }
+.fc__sw--proj { background: transparent; border: 1.5px dashed var(--accent-violet); }
+
+.fc__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; margin: 0; }
+.fc__stat { padding: .6rem .8rem; border-radius: var(--radius-md); background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.fc__stat dt { font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-50); }
+.fc__stat dd { margin: .15rem 0 0; font: .95rem var(--font-mono); }
+
+/* =========================================================================
+   PHONE RESPONSIVE PASS + HOVERS  (append to the very end of layout.css)
+   - hovers only on devices that really hover (no sticky hover on touch)
+   - touch devices get :active press feedback + 44px tap targets
+   - calmer background on inner pages, readable hero, compact stat tiles
+   ========================================================================= */
+
+/* ---------- shared transitions for the new hovers ---------- */
+.card, .stat, .ex-card, .ins-tile, .spot-spec, .def-row, .style-opt span, .reminder-row, .admin-card {
+  transition: transform .4s var(--ease-out), background .3s, border-color .3s, box-shadow .4s var(--ease-out);
+}
+.btn--solid { transition: transform .25s var(--ease-out), background .25s var(--ease-out), box-shadow .35s var(--ease-out), opacity .2s; }
+.spot-card__photo, .spot-panel__img, .tpl__photo { transition: transform .8s var(--ease-out); }
+.nav__mark svg { transition: transform .6s var(--ease-out); }
+.footer a, .back, .modal__link, .btn--text { transition: color .2s, transform .2s; }
+.heatmap__cell { transition: transform .25s var(--ease-out), filter .25s; }
+
+/* revealed cards keep the slow fade-in but get a snappy hover transform */
+.js .card[data-reveal].is-visible, .js .choice[data-reveal].is-visible {
+  transition: opacity .8s var(--ease-out), transform .45s var(--ease-out), background .3s, border-color .3s, box-shadow .4s var(--ease-out);
+}
+
+/* ---------- HOVERS: mouse / trackpad only ---------- */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover, .stat:hover, .admin-card:hover,
+  .js .card[data-reveal].is-visible:hover {
+    transform: translateY(-5px);
+    background: rgba(18, 18, 28, .55);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.18), 0 24px 60px rgba(0,0,0,.45), 0 0 50px rgba(141,124,255,.14);
+  }
+  .btn--solid:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255,255,255,.18); }
+  .btn--glass:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,.12); }
+  .btn--glass:active:not(:disabled), .btn--solid:active:not(:disabled) { transform: scale(.97); }
+  .nav__mark:hover svg { transform: rotate(90deg) scale(1.1); }
+  .nav__right .btn--text:hover { color: var(--ink); }
+  .footer a:hover, .back:hover { transform: translateX(2px); }
+  .js .choice[data-reveal].is-visible:hover { transform: translateY(-6px); background: rgba(18,18,28,.55); }
+  .choice:hover .choice__cta { gap: .9rem; }
+  .choice__cta { transition: gap .3s var(--ease-out); }
+  .ex-card:hover, .ins-tile:hover, .spot-spec:hover { transform: translateY(-3px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.22); }
+  .def-row:hover, .reminder-row:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+  .style-opt:hover span { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.3); }
+  .heatmap__cell:hover { transform: scale(1.18); filter: brightness(1.25); }
+  .tip:hover .tip__kind { background: rgba(255,255,255,.16); }
+  .pcard__toggle:hover .pcard__chev { transform: translateY(0) rotate(45deg); }
+  .pcard.is-open .pcard__toggle:hover .pcard__chev { transform: translateY(0) rotate(-135deg); }
+  .ptab:not(.is-active):hover { background: rgba(255,255,255,.08); }
+
+  /* swiper */
+  .spot__item:not(.is-active):hover { opacity: .8; transform: scale(.9); filter: saturate(.9); }
+  .spot__item.is-active .spot-card:hover { box-shadow: inset 0 1px 1px rgba(255,255,255,.2), 0 28px 70px rgba(0,0,0,.55), 0 0 60px rgba(141,124,255,.22); }
+  .spot-card:hover .spot-card__photo { transform: scale(1.06); }
+  .spot-card:hover .spot-card__hint { letter-spacing: .2em; }
+  .spot-card__hint { transition: opacity .4s, letter-spacing .4s var(--ease-out); }
+  .spot__arrow { transition: transform .3s var(--ease-out), background .25s, opacity .25s; }
+  .spot__arrow:hover:not(:disabled) { transform: translateY(-50%) scale(1.12); background: rgba(255,255,255,.14); }
+  .spot__dot:hover { background: rgba(255,255,255,.6); }
+  .tpl:hover .tpl__photo { transform: scale(1.05); }
+  .tpl__photo { overflow: hidden; }
+  .spot-panel__close:hover { transform: rotate(90deg); }
+  .spot-panel__close { transition: transform .35s var(--ease-out), color .25s, background .25s; }
+}
+
+/* ---------- TOUCH: no sticky hover, clear press feedback ---------- */
+@media (hover: none) {
+  .choice:hover, .plan:hover:not(.is-done), .pcard:not(.is-open):hover, .js .tpl:hover, .insight-plan:hover,
+  .week__day:hover .week__bar, .btn--exit:hover { transform: none; }
+  .choice:hover { background: rgba(12, 12, 20, .42); }
+  .spot__item:not(.is-active):hover { opacity: .45; }
+  .card:active, .choice:active, .pcard__cover:active, .tpl:active, .ex-card:active { transform: scale(.985); }
+  .spot-card:active { transform: scale(.985); }
+  .spot-card { transition: transform .25s var(--ease-out); }
+  .btn:active, .icon-btn:active, .ptab:active, .spot__dot:active { opacity: .8; }
+}
+
+/* ---------- PHONES (<= 860px) ---------- */
+@media (max-width: 860px) {
+  /* inner pages: the flower must not fight with the content */
+  body:has(.page) .bg-video { opacity: .22; }
+  body:has(.page) .bg-scrim {
+    background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.35) 40%, rgba(0,0,0,.7) 100%);
+  }
+
+  /* home hero: keep the headline legible over the flower stem */
+  .hero { min-height: 100svh; padding-bottom: max(6vh, 2rem); }
+  .hero__content { position: relative; }
+  .hero__content::before {
+    content: ''; position: absolute; inset: -2.5rem -.5rem -1rem -.5rem; z-index: -1; pointer-events: none;
+    background: radial-gradient(90% 80% at 40% 55%, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 55%, rgba(0,0,0,0) 100%);
+  }
+
+  /* mobile menu panel eases in */
+  .nav__panel.is-open { animation: spot-rise .35s var(--ease-out) both; }
+  .nav__toggle { width: 2.75rem; height: 2.75rem; font-size: 1.15rem; }
+
+  /* section rhythm */
+  .section { padding: var(--space-4) 0; }
+  .section__head { margin-bottom: var(--space-3); }
+
+  /* cards are comfortable to read one-handed */
+  .card, .choice { padding: var(--space-3); }
+  .choice__title { font-size: clamp(1.45rem, 6vw, 1.9rem); }
+  .cta-band { padding: var(--space-4) var(--space-3); }
+
+  /* swiper: bigger, easier targets */
+  .spot__track { padding: 1.5rem 0 2rem; }
+  .spot__dot { width: 9px; height: 9px; }
+  .spot__dot.is-on { width: 28px; }
+  .spot-panel__close { width: 2.75rem; height: 2.75rem; }
+  .spot-panel__actions .btn { flex: 1 1 100%; min-height: 3rem; }
+  .spot-panel__title { font-size: clamp(1.5rem, 6.5vw, 2rem); }
+
+  /* forms */
+  .seg { max-width: 100%; flex-wrap: wrap; border-radius: var(--radius-md); }
+  .seg span { padding: .55rem 1rem; }
+  .group__label { flex-wrap: wrap; }
+  .page-head .h2, .page-head h1 { overflow-wrap: anywhere; }
+}
+
+/* ---------- SMALL PHONES (<= 560px) ---------- */
+@media (max-width: 560px) {
+  /* stats: three compact tiles side by side instead of three tall rows */
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+  .stat { display: block; padding: .85rem .6rem; text-align: center; }
+  .stat__label { font-size: .6rem; letter-spacing: .1em; }
+  .stat__value { margin-top: .25rem; font-size: clamp(1.15rem, 5.5vw, 1.5rem); }
+
+  /* hero buttons stack full width */
+  .hero__actions { flex-direction: column; align-items: stretch; gap: .7rem; }
+  .hero__actions .btn { width: 100%; min-height: 3.1rem; }
+  .cta-band .btn { width: 100%; }
+
+  /* footer */
+  .footer { flex-direction: column; align-items: center; text-align: center; gap: .5rem; }
+
+  /* heatmap / week bars breathe */
+  .heatmap { gap: 6px; }
+  .week { padding: 1rem; }
+  .week__bars { gap: .4rem; height: 6.5rem; }
+
+  /* insight tiles + dashboard cover */
+  .cover-meta { gap: .5rem; }
+  .cover-insight { flex-direction: column; align-items: stretch; }
+  .mini-bars { align-self: flex-start; grid-template-columns: repeat(8, 1fr); width: 100%; height: 2rem; }
+  .pcard__cover .plan__title { font-size: 1.3rem; }
+
+  /* admin cards go single column */
+  .admin-grid { grid-template-columns: 1fr; }
+  .admin-card__row { flex-wrap: wrap; }
+
+  /* modal */
+  .modal { padding: var(--space-3) 1.2rem; }
+  .modal__tabs { margin-bottom: var(--space-2); }
+}
+
+/* ---------- VERY SMALL PHONES (<= 360px) ---------- */
+@media (max-width: 360px) {
+  :root { --space-3: 1.2rem; }
+  .wrap { padding: 0 .9rem; }
+  .nav__mark span { font-size: .98rem; }
+  .nav__pill { padding-left: .8rem; gap: .4rem; }
+  .btn { padding: .75rem 1.2rem; }
+  .btn--sm { padding: .5rem .8rem; }
+  .stat__label { font-size: .56rem; }
+  .ptab { padding-inline: .8rem; font-size: .8rem; }
+  .stepper input { width: 3.4rem; }
+  .spot { --card-w: 78vw; }
+}
+
+/* ---------- TOUCH TARGETS (any touch screen) ---------- */
+@media (pointer: coarse) {
+  .btn--sm { min-height: 2.75rem; }
+  .btn { min-height: 2.75rem; }
+  .icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
+  .ptab { min-height: 2.5rem; }
+  .chip span, .presets button { padding: .6rem 1.05rem; }
+  .nav__panel a { min-height: 2.9rem; display: flex; align-items: center; }
+  .modal__link { padding: .5rem 0; }
+}
+
+/* ---------- LANDSCAPE PHONES ---------- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero { min-height: 0; padding: calc(5.5rem + var(--safe-top)) 0 2rem; }
+  .section { padding: var(--space-4) 0; }
+  .spot { --card-h: clamp(260px, 70vh, 340px); }
+  .spot-panel { max-height: 94dvh; }
+}
