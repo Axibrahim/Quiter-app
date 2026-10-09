@@ -9,7 +9,8 @@
  *       'none'      -> don't even check the session (verify / reset / email check-in)
  */
 import { initBackground } from '../bg-video.js';
-import { loadUser } from './auth-state.js';
+import { loadUser, logout, sessionCheckWasOffline } from './auth-state.js';
+import { initPWA } from '../pwa.js';
 import { initAuthModal, openAuthModal } from './auth-modal.js';
 
 
@@ -19,13 +20,14 @@ function link(href, label, key, active) {
   return `<a href="${href}"${key === active ? ' class="is-active" aria-current="page"' : ''}>${label}</a>`;
 }
 
-function renderNav(user, active) {
+function renderNav(user, active, offline = false) {
   const links = [
     link('plans.html', 'Start a plan', 'plans', active),
     ...(user ? [link('dashboard.html', 'Dashboard', 'dashboard', active)] : [link('index.html#how', 'How it works', 'how', active)]),
   ].join('');
 
-  const right = user
+  const right = offline ? ''
+    : user
     ? `${user.is_admin ? '<a class="btn btn--text btn--sm" href="admin.html">Admin</a>' : ''}
        <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${(user.display_name || 'Me').split(' ')[0]}</a>`
     : `<button class="btn btn--text btn--sm" type="button" data-open-auth="login">Log in</button>
@@ -64,12 +66,29 @@ function initReveal() {
   items.forEach((el) => io.observe(el));
 }
 
+function showOfflineNotice() {
+  const main = document.querySelector('main') || document.body;
+  const box = document.createElement('div');
+  box.className = 'offline-notice liquid-glass liquid-glass--panel';
+  box.setAttribute('role', 'status');
+  box.innerHTML = `<h2 class="h3">You're offline</h2>
+    <p>Quiter needs a connection to load your plans. Reconnect and this page refreshes by itself.</p>
+    <button class="btn btn--solid btn--sm" type="button">Try again</button>`;
+  box.querySelector('button').addEventListener('click', () => location.reload());
+  main.classList.add('is-offline');          // CSS hides the empty page skeleton behind the notice
+  main.prepend(box);
+  window.addEventListener('online', () => location.reload());
+}
+
 export async function initShell({ active = '', auth = 'optional' } = {}) {
   document.documentElement.classList.add('js');
   initBackground();
 
+  initPWA({ hint: auth !== 'none' });
+
   const user = auth === 'none' ? null : await loadUser();
-  renderNav(user, active);
+  const offline = !user && auth !== 'none' && sessionCheckWasOffline();
+  renderNav(user, active, offline);
   initAuthModal();
 
   // Any element with data-open-auth opens the modal; data-requires-auth links
@@ -80,6 +99,12 @@ export async function initShell({ active = '', auth = 'optional' } = {}) {
     const gated = e.target.closest('[data-requires-auth]');
     if (gated && !user) { e.preventDefault(); openAuthModal('signup', gated.getAttribute('href')); }
   });
+
+  if (auth === 'required' && !user && offline) {
+    // No connection is not the same as logged out: keep the page, say so, and come back when we're online.
+    showOfflineNotice();
+    return null;
+  }
 
   if (auth === 'required' && !user) {
     window.location.replace(`index.html?login=1&next=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}`);

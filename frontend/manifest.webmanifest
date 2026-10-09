@@ -1,0 +1,27 @@
+{
+  "id": "./",
+  "name": "Quiter — Personal Coach",
+  "short_name": "Quiter",
+  "description": "Your personal coach: daily plans, one-tap check-ins and motivation that keeps you on track.",
+  "start_url": "./dashboard.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["health", "fitness", "productivity", "lifestyle"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "assets/pwa/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pwa/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pwa/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today", "short_name": "Today", "url": "./dashboard.html?source=shortcut",
+      "icons": [{ "src": "assets/pwa/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "New plan", "short_name": "New plan", "url": "./plans.html?source=shortcut",
+      "icons": [{ "src": "assets/pwa/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}

@@ -10,4 +10,8 @@ const PROD_API_BASE = 'https://YOUR-REAL-BACKEND.up.railway.app/api/v1';
 
 const isLocal = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
 
-export const API_BASE = window.QUITER_API_BASE || (isLocal ? 'http://127.0.0.1:5000/api/v1' : PROD_API_BASE);
+// Local development follows the page's protocol, so an https:// dev page talks to an https:// dev API
+// (browsers block an https page from calling plain http for anything but loopback, and iOS needs https for PWAs).
+const localProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+
+export const API_BASE = window.QUITER_API_BASE || (isLocal ? `${localProtocol}//127.0.0.1:5000/api/v1` : PROD_API_BASE);

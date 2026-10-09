@@ -1,9 +1,15 @@
 /**
- * Dashboard: one glass card per plan.
- * - Blue's suggestions (up to 3, based on your progress) sit right under the plan name
- * - The circle checkbox marks today complete (athletes: saves their numbers too)
- * - Blue's daily message loads per plan (AI when configured, templates otherwise)
- * - "I missed today" needs a second tap to confirm (it resets the streak)
+ * Dashboard v3: plan covers + expandable details.
+ *
+ * COVER (always visible): badge, title, day, progress meter, streak / best,
+ *   today's status pill and a one-line progress insight with a mini weekly chart.
+ * OPENED (tap a cover): three tabs
+ *   Today          check-in circle, Blue's message, today's numbers, off day, missed
+ *   Insights       adherence tiles + weekly chart
+ *   Blue suggests  AI suggestions
+ *
+ * Blue's message and suggestions load only when a plan is opened (fewer AI calls).
+ * One plan is open at a time.
  */
 
 import { api, errorText } from './modules/api-client.js';
@@ -18,16 +24,6 @@ const OFF_ERRORS = {
   off_days_athletes_only: 'Off days are for athlete plans.',
 };
 
-function offNote(p) {
-  const o = p.off_day;
-  if (!o || p.is_completed) return '';
-  if (o.is_off_today) return '<p class="off-note is-on">Rest day. Your streak is safe, so recover well.</p>';
-  if (typeof o.weekday === 'number') {
-    return `<p class="off-note">Blue's off day: ${WEEKDAYS[o.weekday]}s${o.reason ? ' · ' + esc(o.reason) : ''}</p>`;
-  }
-  return '';
-}
-
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;',
   '<': '&lt;',
@@ -36,9 +32,15 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
   "'": '&#39;'
 }[c]));
 
+const clamp = (n) => Math.max(0, Math.min(100, Number(n) || 0));
+
 const listEl = document.getElementById('plans');
 const errEl = document.getElementById('dash-error');
 let plans = [];
+
+const cardEl = (p) => listEl.querySelector(`[data-id="${CSS.escape(p.user_plan_id)}"]`);
+
+/* ---------------------------------------------------------------- naming */
 
 // Athlete goals are stored as "Sport — target"; the sport already shows as a badge.
 const cleanGoal = (p) => (
@@ -58,6 +60,35 @@ const phaseShort = (p) => (
   p.phase_label ? p.phase_label.split('—')[0].trim() : ''
 );
 
+/* ------------------------------------------------------- today's status */
+
+function todayState(p) {
+  const athlete = p.plan_type === 'athletic';
+  const done = !!(p.already_logged_today || p.is_completed);
+  const isOff = athlete && !!p.off_day?.is_off_today;
+  return { athlete, done, isOff };
+}
+
+function statusPill(p) {
+  const { athlete, done, isOff } = todayState(p);
+  if (p.is_completed) return ['done', 'Plan complete'];
+  if (done) return ['done', athlete ? 'Done today' : 'On track today'];
+  if (isOff) return ['rest', 'Rest day'];
+  return ['todo', 'Not logged yet'];
+}
+
+function offNote(p) {
+  const o = p.off_day;
+  if (!o || p.is_completed) return '';
+  if (o.is_off_today) return '<p class="off-note is-on">Rest day. Your streak is safe, so recover well.</p>';
+  if (typeof o.weekday === 'number') {
+    return `<p class="off-note">Blue's off day: ${WEEKDAYS[o.weekday]}s${o.reason ? ' · ' + esc(o.reason) : ''}</p>`;
+  }
+  return '';
+}
+
+/* ------------------------------------------------------ Blue suggestions */
+
 // Short chip text for each kind of suggestion Blue can give.
 const TIP_LABEL = {
   food: 'Food',
@@ -73,30 +104,21 @@ const TIP_LABEL = {
   mindset: 'Mindset',
 };
 
-// Blue's suggestions. p.tips === undefined means "not loaded yet" (shimmer).
-// [] means "nothing to show".
+// p.tips === undefined means "not loaded yet" (shimmer). [] means "nothing to show".
 function tipsHtml(p) {
   if (p.is_completed || p.is_abandoned) return '';
 
   if (!p.tips) {
     return `<div class="tips is-loading" aria-busy="true">
-      <p class="tips__label">
-        <span class="blue-dot" aria-hidden="true"></span>
-        Blue is reading your progress…
-      </p>
-      <ul class="tips__list" aria-hidden="true">
-        <li></li><li></li><li></li>
-      </ul>
+      <p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue is reading your progress…</p>
+      <ul class="tips__list" aria-hidden="true"><li></li><li></li><li></li></ul>
     </div>`;
   }
 
   if (!p.tips.length) return '';
 
   return `<div class="tips">
-    <p class="tips__label">
-      <span class="blue-dot" aria-hidden="true"></span>
-      Blue suggests
-    </p>
+    <p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue suggests</p>
     <ul class="tips__list">${p.tips.map((t) =>
       `<li class="tip">
         <span class="tip__kind tip__kind--${esc(t.k)}">${esc(TIP_LABEL[t.k] || 'Tip')}</span>
@@ -106,7 +128,10 @@ function tipsHtml(p) {
   </div>`;
 }
 
-// ---- Athlete numbers: usual day summary + optional "changed today" steppers ----
+const tipsPane = (p) => tipsHtml(p)
+  || '<p class="pane-empty">No suggestions right now. Keep checking in and Blue will adapt.</p>';
+
+/* ------------------------------------------------------ athlete numbers */
 
 const STEP = {
   reps: 1,
@@ -121,7 +146,7 @@ const hasDefault = (ex) => Number(ex.default) > 0;
 const fmtNum = (n) => String(Math.round(Number(n) * 100) / 100);
 
 function exerciseBlock(p) {
-  if (p.plan_type !== 'athletic' || !p.tracked_exercises.length) return '';
+  if (p.plan_type !== 'athletic' || !p.tracked_exercises?.length) return '';
 
   const done = p.already_logged_today || p.is_completed;
 
@@ -156,34 +181,15 @@ function exerciseBlock(p) {
             <small>${esc(ex.unit)}</small>
           </div>
           <div class="stepper">
-            <button
-              class="stepper__btn"
-              type="button"
-              data-dir="-1"
-              aria-label="Decrease ${esc(ex.label)}"
-            >−</button>
-            <input
-              type="number"
-              inputmode="decimal"
-              min="0"
-              step="any"
-              data-key="${esc(ex.key)}"
-              value="${esc(start)}"
-              placeholder="0"
-              aria-label="${esc(ex.label)} today in ${esc(ex.unit)}"
-            >
-            <button
-              class="stepper__btn"
-              type="button"
-              data-dir="1"
-              aria-label="Increase ${esc(ex.label)}"
-            >+</button>
+            <button class="stepper__btn" type="button" data-dir="-1" aria-label="Decrease ${esc(ex.label)}">−</button>
+            <input type="number" inputmode="decimal" min="0" step="any"
+              data-key="${esc(ex.key)}" value="${esc(start)}" placeholder="0"
+              aria-label="${esc(ex.label)} today in ${esc(ex.unit)}">
+            <button class="stepper__btn" type="button" data-dir="1" aria-label="Increase ${esc(ex.label)}">+</button>
           </div>
         </div>`;
       }).join('')}</div>
-      <button class="btn btn--solid btn--sm" type="button" data-log-nums>
-        Log today's numbers
-      </button>
+      <button class="btn btn--solid btn--sm" type="button" data-log-nums>Log today's numbers</button>
     </div>`;
 
   return `<div class="nums">
@@ -193,155 +199,11 @@ function exerciseBlock(p) {
   </div>`;
 }
 
-function cardHtml(p) {
-  const pct = Math.min(
-    100,
-    Math.round((p.day_number / p.total_days) * 100)
-  );
-
-  const athlete = p.plan_type === 'athletic';
-  const done = p.already_logged_today || p.is_completed;
-
-  const coach = p.is_completed ? '' : `
-    <div class="coach ${p.coach_message ? '' : 'is-loading'}" data-coach>
-      <p class="coach__label">Blue</p>
-      <p class="coach__text">${esc(
-        p.coach_message || 'Blue is writing today’s message…'
-      )}</p>
-    </div>`;
-
-  const usual = athlete && p.tracked_exercises.some(hasDefault);
-
-  const isOff = athlete && !!p.off_day?.is_off_today;
-
-  const offToggle = athlete && !done && !p.is_completed
-    ? `<button class="btn btn--glass liquid-glass btn--sm btn--off${isOff ? ' is-on' : ''}"
-         type="button" data-off aria-pressed="${isOff}">${isOff ? 'Remove off day' : 'Add off day'}</button>`
-    : '';
-
-  const checkLabel = p.is_completed
-    ? 'Plan complete'
-    : done
-      ? (athlete ? 'Done for today' : 'Marked as on track')
-      : usual
-        ? 'I did my usual numbers today'
-        : "Yes, I'm on track today";
-
-  const video = p.video_checkin_frequency && !p.is_completed
-    ? `<a class="btn btn--text btn--sm" href="progress.html?plan=${esc(p.user_plan_id)}#video">Video check-in</a>`
-    : '';
-
-  return `
-  <article class="plan liquid-glass liquid-glass--panel ${done ? 'is-done' : ''}" data-id="${esc(p.user_plan_id)}">
-    <div class="plan__top">
-      <span class="badge ${athlete ? 'badge--athlete' : ''}">
-        ${athlete ? esc(p.sport_label || 'Athlete') : 'Personal'}
-      </span>
-      <span class="plan__day">Day ${p.day_number} of ${p.total_days}</span>
-    </div>
-
-    <h2 class="plan__title">${esc(headline(p))}</h2>
-
-    ${(phaseShort(p) || headline(p) !== cleanGoal(p))
-      ? `<p class="plan__sub">${esc(
-          [phaseShort(p), cleanGoal(p)]
-            .filter((x) => x && x !== headline(p))
-            .join(' · ')
-        )}</p>`
-      : ''}
-
-    <div data-tips>${tipsHtml(p)}</div>
-
-    <div class="meter" role="progressbar"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow="${pct}">
-      <i style="width:${pct}%"></i>
-    </div>
-
-    <div class="plan__stats">
-      <span>Streak <b>${p.current_streak}</b></span>
-      <span>Best <b>${p.longest_streak}</b></span>
-    </div>
-
-    ${coach}
-
-    ${!p.is_completed && p.micro_goal
-      ? `<p class="today__goal">${esc(p.micro_goal)}</p>`
-      : ''}
-
-    ${!p.is_completed && p.identity_cue
-      ? `<p class="today__cue">${esc(p.identity_cue)}</p>`
-      : ''}
-
-    ${exerciseBlock(p)}
-    ${offNote(p)}
-
-    <p class="error" data-error role="alert"></p>
-    <div class="plan__actions">
-      <div class="plan__primary">
-        <label class="q-check q-check--lg">
-          <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
-          <span class="q-check__box"></span>
-          <span class="q-check__label">${checkLabel}</span>
-        </label>
-        ${offToggle}
-      </div>
-
-      <div class="plan__links">
-    <div class="plan__actions">
-      <label class="q-check q-check--lg">
-        <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
-        <span class="q-check__box"></span>
-        <span class="q-check__label">${checkLabel}</span>
-      </label>
-
-      <div class="plan__links">
-        ${athlete && !done && p.tracked_exercises.length
-          ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-edit-toggle>Numbers changed today?</button>'
-          : ''}
-
-        ${!done && !isOff
-          ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>'
-          : ''}
-
-        ${video}
-
-        <a class="btn btn--text btn--sm" href="progress.html?plan=${esc(p.user_plan_id)}">Progress</a>
-
-        ${!p.is_completed
-          ? '<button class="btn btn--exit btn--sm" type="button" data-exit>Exit plan</button>'
-          : ''}
-      </div>
-    </div>
-  </article>`;
-}
-
-function render() {
-  const active = plans.filter(
-    (p) => !p.is_abandoned && !p.is_completed
-  ).length;
-
-  document.getElementById('new-plan').hidden = active >= MAX_PLANS;
-
-  if (!plans.length) {
-    listEl.innerHTML = `<div class="empty liquid-glass liquid-glass--panel">
-      <h2 class="h3">No plan yet</h2>
-      <p>Pick athlete or personal coaching and Blue will take it from there.</p>
-      <a class="btn btn--solid" href="plans.html">Build my first plan</a>
-    </div>`;
-    return;
-  }
-
-  listEl.innerHTML = plans.map(cardHtml).join('');
-}
+/* -------------------------------------------------------------- insights */
 
 function weekRange(week) {
   const fmt = (value) => new Date(`${value}T00:00:00`)
-    .toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric'
-    });
+    .toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
   return `${fmt(week.start)} – ${fmt(week.end)}`;
 }
@@ -368,169 +230,374 @@ function progressInsight(summary) {
   return `You completed ${summary.completed_total} of ${summary.days_elapsed} plan days (${summary.adherence_pct}%) so far. Another week of history will reveal your trend.`;
 }
 
-function insightCard(plan, analytics) {
-  if (!analytics?.summary || !Array.isArray(analytics.weekly)) {
-    return `<article class="insight-plan">
-      <h3>${esc(headline(plan))}</h3>
-      <p class="field__hint">Progress details couldn't load.</p>
-    </article>`;
+const analyticsOk = (a) => !!(a?.summary && Array.isArray(a.weekly));
+
+// One-line insight + tiny weekly bars, shown on the cover.
+function coverInsight(p) {
+  const a = p._an;
+
+  if (a === undefined) {
+    return `<div class="cover-insight is-loading" aria-busy="true">
+      <div class="cover-insight__copy"><p class="cover-insight__text">Reading your rhythm…</p></div>
+    </div>`;
   }
 
-  const summary = analytics.summary;
+  if (!analyticsOk(a)) return '';
 
-  if (!summary.completed_total) {
-    return `<article class="insight-plan">
-      <div class="insight-plan__head">
-        <h3>${esc(headline(plan))}</h3>
-        <span class="insight-plan__rate">No check-ins yet</span>
-      </div>
-      <p class="insight-plan__text">${esc(progressInsight(summary))}</p>
-    </article>`;
+  const s = a.summary;
+
+  const bars = s.completed_total
+    ? `<ol class="mini-bars" aria-hidden="true">${a.weekly.slice(-8).map((w) =>
+        `<li><span style="height:${clamp(w.pct)}%"></span></li>`
+      ).join('')}</ol>`
+    : '';
+
+  return `<div class="cover-insight">
+    <div class="cover-insight__copy">
+      <p class="cover-insight__label">Insight</p>
+      <p class="cover-insight__text">${esc(progressInsight(s))}</p>
+    </div>
+    ${bars}
+  </div>`;
+}
+
+// Full insight view, shown in the Insights tab.
+function insightsHtml(p) {
+  const a = p._an;
+
+  if (a === undefined) return '<p class="pane-empty">Loading your progress…</p>';
+  if (!analyticsOk(a)) return '<p class="pane-empty">Progress details couldn’t load.</p>';
+
+  const s = a.summary;
+
+  if (!s.completed_total) {
+    return `<p class="pane-empty">${esc(progressInsight(s))}</p>`;
   }
 
-  const bars = analytics.weekly.slice(-8).map((week) => {
-    const pct = Math.max(0, Math.min(100, Number(week.pct) || 0));
+  const last7 = s.last7_pct !== null && s.last7_pct !== undefined ? `${Number(s.last7_pct)}%` : '–';
+
+  const bars = a.weekly.slice(-8).map((week) => {
     const completed = Number(week.completed) || 0;
     const possible = Number(week.possible) || 0;
 
-    return `<li class="insight-chart__week"
-      aria-label="${esc(weekRange(week))}: ${completed} of ${possible} completed">
-      <div class="insight-chart__track" aria-hidden="true">
-        <span style="height:${pct}%"></span>
-      </div>
+    return `<li class="insight-chart__week" aria-label="${esc(weekRange(week))}: ${completed} of ${possible} completed">
+      <div class="insight-chart__track" aria-hidden="true"><span style="height:${clamp(week.pct)}%"></span></div>
       <span class="insight-chart__value">${completed}/${possible}</span>
-      <span class="insight-chart__label">${esc(
-        new Date(`${week.start}T00:00:00`).toLocaleDateString(
-          undefined,
-          { month: 'short', day: 'numeric' }
-        )
-      )}</span>
+      <span class="insight-chart__label">${esc(new Date(`${week.start}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span>
     </li>`;
   }).join('');
 
-  return `<article class="insight-plan">
-    <div class="insight-plan__head">
-      <h3>${esc(headline(plan))}</h3>
-      <span class="insight-plan__rate">${Number(summary.adherence_pct) || 0}% overall</span>
+  return `
+    <div class="ins-tiles">
+      <div class="ins-tile"><p class="ins-tile__label">Overall</p><p class="ins-tile__value">${Number(s.adherence_pct) || 0}%</p></div>
+      <div class="ins-tile"><p class="ins-tile__label">Last 7 days</p><p class="ins-tile__value">${last7}</p></div>
+      <div class="ins-tile"><p class="ins-tile__label">Done</p><p class="ins-tile__value">${Number(s.completed_total) || 0}/${Number(s.days_elapsed) || 0}</p></div>
     </div>
-    <p class="insight-plan__text">${esc(progressInsight(summary))}</p>
-    <ol class="insight-chart" aria-label="Weekly completed check-ins">${bars}</ol>
+    <p class="ins-text">${esc(progressInsight(s))}</p>
+    <div class="ins-chart">
+      <p class="ins-chart__title">Completed check-ins by week</p>
+      <ol class="insight-chart" aria-label="Weekly completed check-ins">${bars}</ol>
+    </div>`;
+}
+
+/* ------------------------------------------------------------- the card */
+
+const TABS = [['today', 'Today'], ['insights', 'Insights'], ['blue', 'Blue suggests']];
+
+const tabsFor = (p) => (p.is_completed ? TABS.filter(([k]) => k === 'insights') : TABS);
+
+function tabOf(p) {
+  const keys = tabsFor(p).map(([k]) => k);
+  return keys.includes(p._tab) ? p._tab : keys[0];
+}
+
+function todayPane(p) {
+  const { athlete, done, isOff } = todayState(p);
+  const usual = athlete && p.tracked_exercises?.some(hasDefault);
+
+  const coach = p.coach_message || !p._coachFailed
+    ? `<div class="coach ${p.coach_message ? '' : 'is-loading'}" data-coach>
+        <p class="coach__label">Blue</p>
+        <p class="coach__text">${esc(p.coach_message || 'Blue is writing today’s message…')}</p>
+      </div>`
+    : '';
+
+  const offToggle = athlete && !done
+    ? `<button class="btn btn--glass liquid-glass btn--sm btn--off${isOff ? ' is-on' : ''}"
+         type="button" data-off aria-pressed="${isOff}">${isOff ? 'Remove off day' : 'Add off day'}</button>`
+    : '';
+
+  const checkLabel = done
+    ? (athlete ? 'Done for today' : 'Marked as on track')
+    : usual
+      ? 'I did my usual numbers today'
+      : "Yes, I'm on track today";
+
+  return `
+    ${coach}
+    ${p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
+    ${p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
+    ${exerciseBlock(p)}
+    ${offNote(p)}
+    <div class="today-actions">
+      <div class="plan__primary">
+        <label class="q-check q-check--lg">
+          <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
+          <span class="q-check__box"></span>
+          <span class="q-check__label">${checkLabel}</span>
+        </label>
+        ${offToggle}
+      </div>
+      <div class="plan__links">
+        ${athlete && !done && p.tracked_exercises?.length
+          ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-edit-toggle>Numbers changed today?</button>'
+          : ''}
+        ${!done && !isOff
+          ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>'
+          : ''}
+      </div>
+    </div>`;
+}
+
+function cardHtml(p) {
+  const pct = clamp((p.day_number / p.total_days) * 100);
+  const { athlete, done } = todayState(p);
+  const [stateKey, stateText] = statusPill(p);
+  const id = esc(p.user_plan_id);
+  const open = !!p._open;
+  const tabs = tabsFor(p);
+  const active = tabOf(p);
+
+  const panes = {
+    today: () => todayPane(p),
+    insights: () => `<div data-insights>${insightsHtml(p)}</div>`,
+    blue: () => `<div data-tips>${tipsPane(p)}</div>`,
+  };
+
+  const tabBar = tabs.length > 1
+    ? `<div class="ptabs" role="tablist" aria-label="Plan sections">${tabs.map(([k, label]) =>
+        `<button class="ptab${k === active ? ' is-active' : ''}" type="button" role="tab"
+          aria-selected="${k === active}" data-tab="${k}">${label}</button>`
+      ).join('')}</div>`
+    : '';
+
+  const paneHtml = tabs.map(([k]) =>
+    `<div class="ppane" role="tabpanel" data-pane="${k}"${k === active ? '' : ' hidden'}>${panes[k]()}</div>`
+  ).join('');
+
+  const video = p.video_checkin_frequency && !p.is_completed
+    ? `<a class="btn btn--text btn--sm" href="progress.html?plan=${id}#video">Video check-in</a>`
+    : '';
+
+  const subParts = [phaseShort(p), cleanGoal(p)].filter((x) => x && x !== headline(p));
+
+  return `
+  <article class="pcard liquid-glass liquid-glass--panel${done ? ' is-done' : ''}${open ? ' is-open' : ''}" data-id="${id}">
+    <div class="pcard__cover" data-cover>
+      <div class="plan__top">
+        <span class="badge ${athlete ? 'badge--athlete' : ''}">${athlete ? esc(p.sport_label || 'Athlete') : 'Personal'}</span>
+        <span class="plan__day">Day ${p.day_number} of ${p.total_days}</span>
+      </div>
+
+      <h2 class="plan__title">${esc(headline(p))}</h2>
+      ${subParts.length ? `<p class="plan__sub">${esc(subParts.join(' · '))}</p>` : ''}
+
+      <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+        <i style="width:${pct}%"></i>
+      </div>
+
+      <div class="cover-meta">
+        <div class="plan__stats">
+          <span>Streak <b>${p.current_streak}</b></span>
+          <span>Best <b>${p.longest_streak}</b></span>
+        </div>
+        <span class="pill pill--${stateKey}">${esc(stateText)}</span>
+      </div>
+
+      <div data-cover-insight>${coverInsight(p)}</div>
+
+      <button class="pcard__toggle" type="button" data-toggle aria-expanded="${open}" aria-controls="d-${id}">
+        <span data-toggle-label>${open ? 'Hide details' : 'Open plan'}</span>
+        <span class="pcard__chev" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <div class="pcard__details" id="d-${id}" data-details>
+      <div class="pcard__details-inner">
+        <div class="pcard__body">
+          ${tabBar}
+          ${paneHtml}
+          <p class="error" data-error role="alert"></p>
+          <div class="pcard__foot">
+            <div class="plan__links">
+              <a class="btn btn--glass liquid-glass btn--sm" href="progress.html?plan=${id}">Full progress</a>
+              ${video}
+            </div>
+            ${!p.is_completed ? '<button class="btn btn--exit btn--sm" type="button" data-exit>Exit plan</button>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
   </article>`;
 }
 
-async function loadDashboardInsights() {
-  const section = document.getElementById('dashboard-insights');
-  const host = document.getElementById('dashboard-insight-list');
-  const visiblePlans = plans.filter((plan) => !plan.is_abandoned);
+function render() {
+  const active = plans.filter((p) => !p.is_abandoned && !p.is_completed).length;
 
-  if (!visiblePlans.length) {
-    section.hidden = true;
+  document.getElementById('new-plan').hidden = active >= MAX_PLANS;
+
+  if (!plans.length) {
+    listEl.innerHTML = `<div class="empty liquid-glass liquid-glass--panel">
+      <h2 class="h3">No plan yet</h2>
+      <p>Pick athlete or personal coaching and Blue will take it from there.</p>
+      <a class="btn btn--solid" href="plans.html">Build my first plan</a>
+    </div>`;
     return;
   }
 
-  section.hidden = false;
-  host.innerHTML = '<p class="field__hint">Loading your progress…</p>';
-
-  const results = await Promise.all(visiblePlans.map(async (plan) => {
-    try {
-      return {
-        plan,
-        analytics: await api.get(`/plans/${plan.user_plan_id}/analytics`)
-      };
-    } catch {
-      return { plan, analytics: null };
-    }
-  }));
-
-  host.innerHTML = results
-    .map(({ plan, analytics }) => insightCard(plan, analytics))
-    .join('');
+  listEl.innerHTML = plans.map(cardHtml).join('');
 }
 
 function replaceCard(p) {
-  const old = listEl.querySelector(
-    `[data-id="${CSS.escape(p.user_plan_id)}"]`
-  );
-
+  const old = cardEl(p);
   if (old) old.outerHTML = cardHtml(p);
 }
+
+/* ------------------------------------------------- open / close / tabs */
+
+function setOpen(card, open) {
+  card.classList.toggle('is-open', open);
+  card.querySelector('[data-toggle]')?.setAttribute('aria-expanded', String(open));
+  const label = card.querySelector('[data-toggle-label]');
+  if (label) label.textContent = open ? 'Hide details' : 'Open plan';
+}
+
+function toggleCard(card, p) {
+  const open = !card.classList.contains('is-open');
+
+  listEl.querySelectorAll('.pcard.is-open').forEach((c) => {
+    if (c !== card) setOpen(c, false);
+  });
+
+  plans.forEach((x) => { x._open = x === p ? open : false; });
+  setOpen(card, open);
+
+  if (open) {
+    ensureLoaded(p);
+    requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  }
+}
+
+function selectTab(card, p, key) {
+  p._tab = key;
+
+  card.querySelectorAll('[data-tab]').forEach((b) => {
+    const on = b.dataset.tab === key;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-selected', String(on));
+  });
+
+  card.querySelectorAll('[data-pane]').forEach((el) => {
+    el.hidden = el.dataset.pane !== key;
+  });
+}
+
+/* --------------------------------------------------------- data loading */
+
+function paintInsights(p) {
+  const card = cardEl(p);
+  if (!card) return;
+
+  const cover = card.querySelector('[data-cover-insight]');
+  if (cover) cover.innerHTML = coverInsight(p);
+
+  const pane = card.querySelector('[data-insights]');
+  if (pane) pane.innerHTML = insightsHtml(p);
+}
+
+async function loadAnalytics(p) {
+  p._an = undefined;
+  paintInsights(p);
+
+  try {
+    p._an = await api.get(`/plans/${p.user_plan_id}/analytics`);
+  } catch {
+    p._an = null;
+  }
+
+  paintInsights(p);
+}
+
+async function loadCoach(p) {
+  if (p._coachBusy || p.coach_message || p.is_completed || p.is_abandoned) return;
+
+  p._coachBusy = true;
+
+  try {
+    const { message } = await api.get(`/plans/${p.user_plan_id}/coach-message`);
+    if (message) p.coach_message = message;
+  } catch {
+    // fall through: no message
+  }
+
+  p._coachBusy = false;
+  if (!p.coach_message) p._coachFailed = true;
+
+  const box = cardEl(p)?.querySelector('[data-coach]');
+  if (!box) return;
+
+  if (p.coach_message) {
+    box.classList.remove('is-loading');
+    box.querySelector('.coach__text').textContent = p.coach_message;
+  } else {
+    box.remove();
+  }
+}
+
+async function loadTips(p) {
+  if (p._tipsBusy || p.tips || p.is_completed || p.is_abandoned) return;
+
+  p._tipsBusy = true;
+
+  try {
+    p.tips = (await api.get(`/plans/${p.user_plan_id}/blue`)).tips || [];
+  } catch {
+    p.tips = [];
+  }
+
+  p._tipsBusy = false;
+
+  const box = cardEl(p)?.querySelector('[data-tips]');
+  if (box) box.innerHTML = tipsPane(p);
+}
+
+// Blue (AI) is only asked when a plan is opened.
+function ensureLoaded(p) {
+  loadCoach(p);
+  loadTips(p);
+}
+
+// Progress changed (check-in / missed day): re-render the card and ask again.
+function refreshAfterProgress(p) {
+  p.tips = undefined;
+  p._tipsBusy = false;
+  replaceCard(p);
+  if (p._open) loadTips(p);
+  loadAnalytics(p);
+}
+
+/* ------------------------------------------------------------ check-ins */
+
+// One tap: the plan's usual numbers for every exercise that has a default.
+const defaultEntries = (p) => (p.tracked_exercises || [])
+  .filter(hasDefault)
+  .map((ex) => ({ exercise_key: ex.key, value: Number(ex.default) }));
 
 function readEntries(card) {
   return [...card.querySelectorAll('.num-edit input[data-key]')]
     .filter((i) => i.value !== '' && Number(i.value) >= 0)
-    .map((i) => ({
-      exercise_key: i.dataset.key,
-      value: Number(i.value)
-    }));
+    .map((i) => ({ exercise_key: i.dataset.key, value: Number(i.value) }));
 }
-
-async function loadCoachMessages() {
-  await Promise.all(
-    plans
-      .filter((p) => !p.coach_message && !p.is_completed && !p.is_abandoned)
-      .map(async (p) => {
-        try {
-          const { message } = await api.get(
-            `/plans/${p.user_plan_id}/coach-message`
-          );
-
-          if (message) p.coach_message = message;
-        } catch {
-          // Keep the placeholder text out: fall back to nothing.
-        }
-
-        const box = listEl.querySelector(
-          `[data-id="${CSS.escape(p.user_plan_id)}"] [data-coach]`
-        );
-
-        if (!box) return;
-
-        if (p.coach_message) {
-          box.classList.remove('is-loading');
-          box.querySelector('.coach__text').textContent = p.coach_message;
-        } else {
-          box.remove();
-        }
-      })
-  );
-}
-
-// Blue's suggestions for every plan that doesn't have them yet.
-async function loadTips() {
-  await Promise.all(
-    plans
-      .filter((p) => !p.tips && !p.is_completed && !p.is_abandoned)
-      .map(async (p) => {
-        try {
-          p.tips = (await api.get(`/plans/${p.user_plan_id}/blue`)).tips || [];
-        } catch {
-          p.tips = [];
-        }
-
-        const box = listEl.querySelector(
-          `[data-id="${CSS.escape(p.user_plan_id)}"] [data-tips]`
-        );
-
-        if (box) box.innerHTML = tipsHtml(p);
-      })
-  );
-}
-
-// Progress changed (check-in / missed day): re-render the card and ask Blue again.
-function refreshAfterProgress(p) {
-  p.tips = undefined;
-  replaceCard(p);
-  loadTips();
-  loadDashboardInsights();
-}
-
-// One tap: the plan's usual numbers for every exercise that has a default.
-const defaultEntries = (p) => p.tracked_exercises
-  .filter(hasDefault)
-  .map((ex) => ({
-    exercise_key: ex.key,
-    value: Number(ex.default)
-  }));
 
 async function complete(p, entries) {
   let result;
@@ -541,34 +608,26 @@ async function complete(p, entries) {
       { entries, checkin: true }
     ));
 
-    entries.forEach((e) => {
-      p.today_values[e.exercise_key] = e.value;
-    });
+    p.today_values = p.today_values || {};
+    entries.forEach((e) => { p.today_values[e.exercise_key] = e.value; });
   } else {
-    result = await api.post(
-      `/plans/${p.user_plan_id}/checkin`,
-      { status: 'completed' }
-    );
+    result = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'completed' });
   }
 
   p.already_logged_today = true;
 
   if (result) {
     p.current_streak = result.current_streak;
-    p.longest_streak = Math.max(
-      p.longest_streak,
-      result.longest_streak ?? result.current_streak
-    );
+    p.longest_streak = Math.max(p.longest_streak, result.longest_streak ?? result.current_streak);
     p.is_completed = !!result.is_completed;
   }
 }
-
 
 listEl.addEventListener('change', async (e) => {
   const box = e.target.closest('[data-done]');
   if (!box || !box.checked) return;
 
-  const card = box.closest('.plan');
+  const card = box.closest('.pcard');
   const p = plans.find((x) => x.user_plan_id === card.dataset.id);
   const err = card.querySelector('[data-error]');
 
@@ -576,11 +635,7 @@ listEl.addEventListener('change', async (e) => {
   box.disabled = true;
 
   try {
-    await complete(
-      p,
-      p.plan_type === 'athletic' ? defaultEntries(p) : []
-    );
-
+    await complete(p, p.plan_type === 'athletic' ? defaultEntries(p) : []);
     refreshAfterProgress(p);
   } catch (ex) {
     box.checked = false;
@@ -597,11 +652,26 @@ listEl.addEventListener('change', async (e) => {
 });
 
 listEl.addEventListener('click', async (e) => {
-  const card = e.target.closest('.plan');
+  const card = e.target.closest('.pcard');
   if (!card) return;
 
   const p = plans.find((x) => x.user_plan_id === card.dataset.id);
+  if (!p) return;
+
   const err = card.querySelector('[data-error]');
+
+  // Tabs inside an opened plan.
+  const tab = e.target.closest('[data-tab]');
+  if (tab) {
+    selectTab(card, p, tab.dataset.tab);
+    return;
+  }
+
+  // Tap the cover (or its button) to open / close the plan.
+  if (e.target.closest('[data-cover]')) {
+    toggleCard(card, p);
+    return;
+  }
 
   // Increase or decrease exercise numbers.
   const bump = e.target.closest('.stepper__btn');
@@ -611,15 +681,9 @@ listEl.addEventListener('click', async (e) => {
     const input = row.querySelector('input');
     const step = Number(row.dataset.step) || 1;
 
-    input.value = String(
-      Math.max(
-        0,
-        Math.round(
-          ((Number(input.value) || 0)
-            + step * Number(bump.dataset.dir)) * 100
-        ) / 100
-      )
-    );
+    input.value = String(Math.max(0, Math.round(
+      ((Number(input.value) || 0) + step * Number(bump.dataset.dir)) * 100
+    ) / 100));
 
     return;
   }
@@ -629,11 +693,11 @@ listEl.addEventListener('click', async (e) => {
 
   if (toggle) {
     const panel = card.querySelector('[data-edit]');
-    const open = panel.hidden;
+    const opening = panel.hidden;
 
-    panel.hidden = !open;
-    card.classList.toggle('is-editing', open);
-    toggle.textContent = open ? 'Cancel' : 'Numbers changed today?';
+    panel.hidden = !opening;
+    card.classList.toggle('is-editing', opening);
+    toggle.textContent = opening ? 'Cancel' : 'Numbers changed today?';
 
     return;
   }
@@ -690,13 +754,8 @@ listEl.addEventListener('click', async (e) => {
 
     try {
       await api.post(`/plans/${p.user_plan_id}/abandon`);
-
-      plans = plans.filter(
-        (x) => x.user_plan_id !== p.user_plan_id
-      );
-
+      plans = plans.filter((x) => x.user_plan_id !== p.user_plan_id);
       render();
-      loadDashboardInsights();
     } catch (ex) {
       err.textContent = errorText(ex.message);
       exit.disabled = false;
@@ -727,7 +786,6 @@ listEl.addEventListener('click', async (e) => {
     return;
   }
 
-
   // Mark a day as missed; requires a second tap for confirmation.
   const miss = e.target.closest('[data-miss]');
 
@@ -745,10 +803,7 @@ listEl.addEventListener('click', async (e) => {
     }
 
     try {
-      const r = await api.post(
-        `/plans/${p.user_plan_id}/checkin`,
-        { status: 'missed' }
-      );
+      const r = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'missed' });
 
       p.already_logged_today = true;
       p.current_streak = r.current_streak ?? 0;
@@ -760,35 +815,25 @@ listEl.addEventListener('click', async (e) => {
   }
 });
 
+/* ----------------------------------------------------------------- init */
+
 export async function initDashboard(user) {
   const now = new Date();
 
   document.getElementById('today-date').textContent =
-    now.toLocaleDateString(undefined, {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric'
-    });
+    now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   const hour = now.getHours();
-
-  const hello = hour < 12
-    ? 'Good morning'
-    : hour < 18
-      ? 'Good afternoon'
-      : 'Good evening';
+  const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
   document.getElementById('greeting').innerHTML =
     `${hello}, <em>${esc((user.display_name || '').split(' ')[0])}.</em>`;
 
   try {
-    plans = (await api.get('/plans/mine'))
-      .filter((p) => !p.is_abandoned);
+    plans = (await api.get('/plans/mine')).filter((p) => !p.is_abandoned);
 
     render();
-    loadDashboardInsights();
-    loadCoachMessages();
-    loadTips();
+    plans.forEach(loadAnalytics);
   } catch (ex) {
     errEl.textContent = errorText(ex.message);
   }

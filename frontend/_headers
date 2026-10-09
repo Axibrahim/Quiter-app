@@ -1,0 +1,18 @@
+# Netlify / Cloudflare Pages header rules (other hosts: set the same headers in their config).
+# The service worker script must never be served from a long-lived HTTP cache, or users get stuck on old versions.
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
+
+/*.html
+  Cache-Control: no-cache
+
+/assets/pwa/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/media/*
+  Accept-Ranges: bytes
