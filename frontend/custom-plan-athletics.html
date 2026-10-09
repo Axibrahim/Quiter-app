@@ -55,13 +55,14 @@
         </button>
       </section>
 
-      <section class="group liquid-glass liquid-glass--panel">
-        <p class="group__label">4 · Your target</p>
-        <div class="field" style="margin:0">
-          <label for="goal">What do you want to reach? <span class="counter" id="goal-count">0 / 200</span></label>
-          <textarea id="goal" maxlength="200" placeholder="e.g. Bench 100 kg for 5 reps, run 10 km under 50 minutes…" required></textarea>
-        </div>
+      <section class="group liquid-glass liquid-glass--panel" id="def-group" hidden>
+        <p class="group__label">4 · Your daily numbers</p>
+        <p class="field__hint def-hint">What you usually do each day. On the dashboard you check in with one tap, and only change a number on days that differ.</p>
+        <div class="def-list" id="def-list"></div>
       </section>
+
+      <section class="group liquid-glass liquid-glass--panel">
+        <p class="group__label">5 · Your target</p>
 
       <div id="common"></div>
       <p class="error" id="form-error" role="alert"></p>

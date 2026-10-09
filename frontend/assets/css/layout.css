@@ -717,3 +717,36 @@ html { -webkit-text-size-adjust: 100%; }
   .plan { grid-template-columns: minmax(0, 1fr); }
   .plan__side { margin-top: var(--space-2); }
 }
+
+
+
+/* ===== Daily numbers: plan form + dashboard ===== */
+.def-hint { margin: -.4rem 0 var(--space-2); }
+.def-list, .num-edit__grid { display: grid; gap: .6rem; }
+.def-row { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .6rem .7rem .6rem 1rem; border-radius: var(--radius-md); background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.def-row__name { display: flex; flex-direction: column; min-width: 0; }
+.def-row__name span { font-size: .95rem; overflow-wrap: anywhere; }
+.def-row__name small { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-40); }
+.stepper { display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0; }
+.stepper__btn { width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--ink); font-size: 1.25rem; line-height: 1; cursor: pointer; transition: background .2s, transform .1s; }
+.stepper__btn:hover { background: rgba(255,255,255,.16); }
+.stepper__btn:active { transform: scale(.94); }
+.stepper__btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+.stepper input { width: 4.6rem; height: 2.4rem; padding: 0 .4rem; text-align: center; border-radius: var(--radius-sm); border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--ink); font-family: var(--font-mono); font-size: 1rem; -moz-appearance: textfield; appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper input:focus { outline: none; border-color: rgba(255,255,255,.55); }
+
+.nums { display: grid; gap: .5rem; }
+.nums__label { font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-50); }
+.num-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 0 1.2rem; }
+.num-row { display: flex; justify-content: space-between; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: .92rem; }
+.num-row__name { overflow-wrap: anywhere; }
+.num-row__val { font-family: var(--font-mono); white-space: nowrap; }
+.num-row__val small { color: var(--ink-40); font-size: .72rem; }
+.num-row.is-changed .num-row__val { color: var(--accent-gold); }
+.num-edit { display: grid; gap: .7rem; padding-top: var(--space-1); }
+.plan.is-editing .q-check { display: none; }
+@media (max-width: 560px) {
+  .def-row { padding: .55rem .6rem .55rem .85rem; }
+  .stepper input { width: 4rem; }
+}

@@ -53,6 +53,7 @@ function addCustomRow() {
   row.className = 'custom-ex';
 
   const inputId = `custom-exercise-${++customExerciseCount}`;
+  row.dataset.cid = String(customExerciseCount);
   const metricId = `${inputId}-metric`;
 
   row.innerHTML = `
@@ -97,6 +98,54 @@ $('exercises').addEventListener('change', (e) => {
 });
 $('add-custom').addEventListener('click', addCustomRow);
 $('goal').addEventListener('input', () => { $('goal-count').textContent = `${$('goal').value.length} / 200`; });
+
+
+// ---- Daily default numbers (one stepper per chosen exercise) -----------------
+const defaults = new Map();   // id -> value as typed; ids: "k:<key>" or "c:<cid>:<metric>"
+const defaultSpec = (metric) => catalog?.metric_defaults?.[metric] || { start: 10, step: 1 };
+
+function currentItems() {
+  const fromCatalog = sport ? sport.exercises.filter((ex) => picked.has(ex.key)).map((ex) => ({
+    id: `k:${ex.key}`, label: ex.label, metric: ex.metric, unit: ex.unit,
+  })) : [];
+  const fromCustom = customRows().map((row) => {
+    const metric = row.querySelector('select').value;
+    return { id: `c:${row.dataset.cid}:${metric}`, label: row.querySelector('input').value.trim(), metric, unit: catalog.metrics[metric] };
+  }).filter((it) => it.label.length >= 2);
+  return [...fromCatalog, ...fromCustom];
+}
+
+function renderDefaults() {
+  const items = currentItems();
+  $('def-group').hidden = !items.length;
+  $('def-list').innerHTML = items.map((it) => {
+    const spec = defaultSpec(it.metric);
+    if (!defaults.has(it.id)) defaults.set(it.id, String(spec.start));
+    return `<div class="def-row" data-id="${esc(it.id)}" data-step="${spec.step}">
+      <div class="def-row__name"><span>${esc(it.label)}</span><small>${esc(it.unit)}</small></div>
+      <div class="stepper">
+        <button class="stepper__btn" type="button" data-dir="-1" aria-label="Decrease ${esc(it.label)}">−</button>
+        <input type="number" inputmode="decimal" min="0" step="any" value="${esc(defaults.get(it.id))}" aria-label="Daily ${esc(it.label)} in ${esc(it.unit)}">
+        <button class="stepper__btn" type="button" data-dir="1" aria-label="Increase ${esc(it.label)}">+</button>
+      </div></div>`;
+  }).join('');
+}
+
+$('def-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.stepper__btn');
+  if (!btn) return;
+  const row = btn.closest('.def-row'), input = row.querySelector('input');
+  const step = Number(row.dataset.step) || 1;
+  const next = Math.max(0, Math.round(((Number(input.value) || 0) + step * Number(btn.dataset.dir)) * 100) / 100);
+  input.value = String(next);
+  defaults.set(row.dataset.id, input.value);
+});
+$('def-list').addEventListener('input', (e) => {
+  const row = e.target.closest('.def-row');
+  if (row) defaults.set(row.dataset.id, e.target.value);
+});
+['sports', 'exercises', 'custom-rows'].forEach((id) => $(id).addEventListener('change', renderDefaults));
+$('custom-rows').addEventListener('click', renderDefaults);   // "Remove" buttons
 
 
 // ---- AI placeholder for "What do you want to reach?" ------------------------
@@ -166,12 +215,20 @@ form.addEventListener('submit', async (e) => {
   }
 
   const tracked = [
-    ...[...picked].map((key) => ({ key })),
+    ...[...picked].map((key) => ({ key, default: Number(defaults.get(`k:${key}`)) })),
     ...customRows()
-      .map((r) => ({ label: r.querySelector('input').value.trim(), metric: r.querySelector('select').value }))
+      .map((r) => {
+        const metric = r.querySelector('select').value;
+        return { label: r.querySelector('input').value.trim(), metric, default: Number(defaults.get(`c:${r.dataset.cid}:${metric}`)) };
+      })
       .filter((c) => c.label),
   ];
   if (!tracked.length) { errorEl.textContent = PLAN_ERRORS.invalid_tracked_exercises; return; }
+  if (tracked.some((t) => !(t.default > 0))) {
+    errorEl.textContent = PLAN_ERRORS.invalid_default_numbers;
+    $('def-group').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   const goal = $('goal').value.trim();
   if (goal.length < 3) { errorEl.textContent = PLAN_ERRORS.invalid_progression_goal; $('goal').focus(); return; }
 

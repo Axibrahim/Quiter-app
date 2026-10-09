@@ -13,6 +13,7 @@ export const PLAN_ERRORS = {
   invalid_sport: 'Pick a sport first.',
   invalid_progression_goal: 'Describe your target in 3–200 characters.',
   invalid_tracked_exercises: 'Pick 1–8 exercises (custom names need 2–60 characters).',
+  invalid_default_numbers: 'Set a daily number above 0 for every exercise.',
 };
 
 const STYLES = [

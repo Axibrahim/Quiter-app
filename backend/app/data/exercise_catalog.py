@@ -25,6 +25,17 @@ METRICS = {
 
 MAX_TRACKED_EXERCISES = 8
 
+
+# Starting value + stepper size per metric for the "daily numbers" form and dashboard.
+METRIC_DEFAULTS = {
+    "reps": {"start": 10, "step": 1},
+    "weight_kg": {"start": 20, "step": 2.5},
+    "duration_min": {"start": 10, "step": 1},
+    "distance_km": {"start": 3, "step": 0.5},
+    "rounds": {"start": 3, "step": 1},
+    "count": {"start": 10, "step": 1},
+}
+
 _RAW = {
     "weightlifting": ("Weightlifting / Gym", [
         ("Back squat", "weight_kg"), ("Front squat", "weight_kg"), ("Bench press", "weight_kg"),

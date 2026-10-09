@@ -22,10 +22,9 @@ from app.models.models import (
     ProgressVideo, ExerciseLog, gen_uuid,
 )
 from app.data.exercise_catalog import (
-    CATALOG, METRICS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
+    CATALOG, METRICS, METRIC_DEFAULTS, MAX_TRACKED_EXERCISES, sport_exists, find_exercise, custom_exercise_key,
     EXPERIENCE_LEVELS, DIET_STYLES, find_phase, phases_for,
 )
-from app.utils.plan_ai import suggest_plan_name
 from app.utils.blue_ai import get_or_create_suggestions
 from app.security.email import (
     send_plan_started_email, send_plan_completed_email,
@@ -158,6 +157,14 @@ def _read_custom_settings(payload):
         None,
     )
 
+def _read_default_number(value):
+    """A daily default must be a real number: 0 < value <= 100000."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or not 0 < value <= 100000:
+        return None
+    return round(float(value), 2)
+
 
 def _read_athletic_payload(payload):
     """
@@ -225,6 +232,12 @@ def _read_athletic_payload(payload):
             if key == "custom-":
                 return None, "invalid_tracked_exercises"
             normalized = {"key": key, "label": label, "metric": metric, "unit": METRICS[metric], "custom": True}
+
+        default = _read_default_number(item.get("default"))
+        if default is None:
+            return None, "invalid_default_numbers"
+        
+        normalized["default"] = default
 
         if normalized["key"] in seen:
             continue
@@ -479,6 +492,7 @@ def get_exercise_catalog():
         "metrics": METRICS,
         "experience_levels": EXPERIENCE_LEVELS,
         "diet_styles": DIET_STYLES,
+        "metric_defaults": METRIC_DEFAULTS,
         "sports": [
             {"key": key, "label": sport["label"], "exercises": sport["exercises"], "phases": phases_for(key)}
             for key, sport in CATALOG.items()
