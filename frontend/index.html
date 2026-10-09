@@ -89,7 +89,23 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section showcase" id="plans-showcase" hidden aria-labelledby="showcase-title">
+    <canvas class="showcase__gl" id="showcase-gl" aria-hidden="true"></canvas>
+    <div class="wrap">
+      <div class="section__head">
+        <p class="eyebrow">Ready-made plans</p>
+        <h2 id="showcase-title">Pick a plan. <em>Start today.</em></h2>
+      </div>
+    </div>
+    <div class="spot" id="spot" role="region" aria-roledescription="carousel" aria-label="Ready-made plans">
+      <button class="spot__arrow spot__arrow--prev liquid-glass" type="button" aria-label="Previous plan">‹</button>
+      <ul class="spot__track" id="spot-track"></ul>
+      <button class="spot__arrow spot__arrow--next liquid-glass" type="button" aria-label="Next plan">›</button>
+    </div>
+    <div class="spot__dots" id="spot-dots"></div>
+  </section>
+
+  <section class="section" id="cta-fallback">
     <div class="wrap">
       <div class="cta-band liquid-glass liquid-glass--panel" data-reveal>
         <h2>Ready when <em>you are.</em></h2>
@@ -104,7 +120,9 @@
 <script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
 <script type="module">
   import { initShell } from './assets/js/modules/shell.js';
+  import { initHomePlans } from './assets/js/home-plans.js';
   initShell({ active: '' });
+  initHomePlans();
 </script>
 </body>
 </html>

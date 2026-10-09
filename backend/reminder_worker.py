@@ -19,6 +19,7 @@ If Resend fails, the claim is released so the next cycle retries.
 """
 import logging
 import os
+from app.utils.off_day import is_off_day
 import time
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
@@ -56,6 +57,9 @@ def _is_due(reminder_time: str, local_now: datetime) -> bool:
     # claim row in reminder_deliveries guarantees it is still sent only once.
     elapsed = (local_now.hour * 60 + local_now.minute) - _minutes(reminder_time)
     return 0 <= elapsed < DUE_WINDOW_MINUTES
+
+
+
 
 
 def _claim_delivery(user_plan_id: str, reminder_date: date, reminder_time: str) -> bool:
@@ -121,6 +125,11 @@ def process_due_reminders() -> int:
                 continue
 
             # Already marked today (dashboard or earlier email)? Don't nag.
+
+            # Rest day: no nagging email.
+            if is_off_day(plan.athletic_metadata, plan.start_date, plan.template.length_days, local_date):
+                continue
+
             if DailyLog.query.filter_by(user_plan_id=plan.id, log_date=local_date).first():
                 continue
 

@@ -26,6 +26,10 @@ from app.data.exercise_catalog import (
     EXPERIENCE_LEVELS, DIET_STYLES, find_phase, phases_for,
 )
 from app.utils.blue_ai import get_or_create_suggestions
+from app.utils.off_day import (
+    default_config as default_off_config, off_config, is_off_day, off_days_in_week,
+    suggest_off_day, MAX_OFF_DAYS_PER_WEEK, MAX_STORED_DATES,
+)
 from app.security.email import (
     send_plan_started_email, send_plan_completed_email,
     send_plan_closed_email, send_streak_milestone_email,
@@ -75,6 +79,10 @@ def _tracked_exercises(user_plan):
     meta = user_plan.athletic_metadata or {}
     items = meta.get("tracked_exercises")
     return items if isinstance(items, list) else []
+
+
+def _is_off(user_plan, day):
+    return is_off_day(user_plan.athletic_metadata, user_plan.start_date, user_plan.template.length_days, day)
 
 
 def _today_in(tz_name):
@@ -311,7 +319,10 @@ def _record_checkin(user_plan, status, note, today):
             .order_by(DailyLog.log_date.desc())
             .first()
         )
-        if previous and (today - previous.log_date).days == 1:
+        if previous and all(
+            _is_off(user_plan, previous.log_date + timedelta(days=i))
+            for i in range(1, (today - previous.log_date).days)
+        ):
             user_plan.current_streak += 1
         else:
             user_plan.current_streak = 1
@@ -444,6 +455,12 @@ def my_plans():
             "micro_goal": plan_day.micro_goal if plan_day else None,
             "identity_cue": plan_day.identity_cue if plan_day else None,
             "already_logged_today": already_logged is not None,
+            "off_day": {
+                "is_off_today": _is_off(up, today),
+                "weekday": off_config(up.athletic_metadata).get("weekday"),
+                "mode": off_config(up.athletic_metadata).get("mode"),
+                "reason": off_config(up.athletic_metadata).get("reason"),
+            } if meta else None,
         })
     return jsonify(out), 200
 
@@ -533,6 +550,91 @@ def goal_placeholder():
         CATALOG[sport]["label"], phase, experience, diet, labels, g.current_user.about_me or "",
     )
     return jsonify({"placeholder": text, "source": source}), 200
+
+
+@plans_bp.route("/off-day-suggestion", methods=["POST"])
+@limiter.limit(GOAL_HINT_RATE_LIMIT)
+@login_required
+def off_day_suggestion():
+    """Blue's suggested weekly off day, shown while the athlete plan is being set up."""
+    payload = request.get_json(silent=True) or {}
+    sport = payload.get("sport")
+    if not sport_exists(sport):
+        return jsonify({"error": "invalid_sport"}), 400
+
+    exercises = []
+    raw = payload.get("tracked_exercises")
+    for item in (raw if isinstance(raw, list) else [])[:MAX_TRACKED_EXERCISES]:
+        if not isinstance(item, dict):
+            continue
+        if item.get("key") is not None:
+            entry = find_exercise(sport, item.get("key"))
+            if entry:
+                exercises.append({"metric": entry["metric"]})
+        elif item.get("metric") in METRICS:
+            exercises.append({"metric": item["metric"]})
+
+    weekday, reason = suggest_off_day(sport, payload.get("phase"), exercises)
+    return jsonify({"weekday": weekday, "reason": reason}), 200
+
+
+@plans_bp.route("/<user_plan_id>/off-day", methods=["POST"])
+@limiter.limit(HABIT_LOG_RATE_LIMIT)
+@login_required
+def set_off_day(user_plan_id):
+    """Body {"off": true} makes today an off day; {"off": false} makes it a training day again."""
+    user_plan, err = _load_plan(user_plan_id)
+    if err:
+        return err
+    if not user_plan.athletic_metadata:
+        return jsonify({"error": "off_days_athletes_only"}), 400
+    if user_plan.is_completed or user_plan.is_abandoned:
+        return jsonify({"error": "plan_not_active"}), 409
+
+    off = (request.get_json(silent=True) or {}).get("off")
+    if not isinstance(off, bool):
+        return jsonify({"error": "invalid_off"}), 400
+
+    today = _local_today(user_plan)
+    if DailyLog.query.filter_by(user_plan_id=user_plan.id, log_date=today).first():
+        return jsonify({"error": "already_logged_today"}), 409
+
+    start, length = user_plan.start_date, user_plan.template.length_days
+    last_day = start + timedelta(days=length - 1)
+    meta = dict(user_plan.athletic_metadata)
+    cfg = {**default_off_config(), **off_config(meta)}
+    iso = today.isoformat()
+    was_off = _is_off(user_plan, today)
+    dates = [d for d in cfg["dates"] if d != iso]
+    train = [d for d in cfg["train_dates"] if d != iso]
+    weekly_today = (
+        isinstance(cfg.get("weekday"), int)
+        and cfg["weekday"] == today.weekday()
+        and start < today < last_day
+    )
+
+    if off:
+        if today >= last_day:
+            return jsonify({"error": "last_day_cannot_be_off"}), 409
+        if not was_off and off_days_in_week(meta, start, length, today) >= MAX_OFF_DAYS_PER_WEEK:
+            return jsonify({"error": "off_day_limit"}), 409
+        if not weekly_today:
+            dates.append(iso)
+    elif weekly_today:
+        train.append(iso)
+
+    cfg["dates"] = sorted(set(dates))[-MAX_STORED_DATES:]
+    cfg["train_dates"] = sorted(set(train))[-MAX_STORED_DATES:]
+    meta["off_day"] = cfg
+    user_plan.athletic_metadata = meta      # reassign: in-place JSONB edits aren't tracked by SQLAlchemy
+    if off:
+        user_plan.last_checkin_date = today  # resting counts as showing up (15-day auto-quit clock)
+    db.session.commit()
+
+    return jsonify({
+        "is_off_day_today": _is_off(user_plan, today),
+        "off_days_this_week": off_days_in_week(meta, start, length, today),
+    }), 200
 
 
 @plans_bp.route("/adopt", methods=["POST"])
@@ -816,6 +918,13 @@ def get_analytics(user_plan_id):
         for row in rows:
             points.setdefault(row.exercise_key, []).append((row.log_date, row.value))
 
+    local_today = _local_today(user_plan)
+    off_dates = frozenset(
+        user_plan.start_date + timedelta(days=i)
+        for i in range((local_today - user_plan.start_date).days + 1)
+        if _is_off(user_plan, user_plan.start_date + timedelta(days=i))
+    )
+
     data = build_analytics(
         start=user_plan.start_date,
         today=_local_today(user_plan),
@@ -1000,6 +1109,16 @@ def create_athletic_plan():
 
     plan_name = suggest_plan_name("athlete", progression_goal, sport_label, athletic_fields.get("phase_label"))
     athletic_fields["plan_name"] = plan_name
+
+    off_choice = payload.get("off_day") or "none"
+    if off_choice not in ("none", "blue"):
+        return jsonify({"error": "invalid_off_day"}), 400
+    if off_choice == "blue":
+        weekday, reason = suggest_off_day(
+            athletic_fields["sport"], athletic_fields["phase"], athletic_fields["tracked_exercises"])
+        athletic_fields["off_day"] = default_off_config("blue", weekday, reason)
+    else:
+        athletic_fields["off_day"] = default_off_config()
 
     template = PlanTemplate(
         slug=f"athletic-{gen_uuid()[:8]}",

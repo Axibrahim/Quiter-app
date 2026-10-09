@@ -10,6 +10,24 @@ import { api, errorText } from './modules/api-client.js';
 
 const MAX_PLANS = 3;
 
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']; // Python weekday(): Monday = 0
+const OFF_ERRORS = {
+  off_day_limit: 'You can rest up to 2 days a week.',
+  last_day_cannot_be_off: "The last day of your plan can't be an off day.",
+  already_logged_today: 'Today is already logged.',
+  off_days_athletes_only: 'Off days are for athlete plans.',
+};
+
+function offNote(p) {
+  const o = p.off_day;
+  if (!o || p.is_completed) return '';
+  if (o.is_off_today) return '<p class="off-note is-on">Rest day. Your streak is safe, so recover well.</p>';
+  if (typeof o.weekday === 'number') {
+    return `<p class="off-note">Blue's off day: ${WEEKDAYS[o.weekday]}s${o.reason ? ' · ' + esc(o.reason) : ''}</p>`;
+  }
+  return '';
+}
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;',
   '<': '&lt;',
@@ -194,6 +212,13 @@ function cardHtml(p) {
 
   const usual = athlete && p.tracked_exercises.some(hasDefault);
 
+  const isOff = athlete && !!p.off_day?.is_off_today;
+
+  const offToggle = athlete && !done && !p.is_completed
+    ? `<button class="btn btn--glass liquid-glass btn--sm btn--off${isOff ? ' is-on' : ''}"
+         type="button" data-off aria-pressed="${isOff}">${isOff ? 'Remove off day' : 'Add off day'}</button>`
+    : '';
+
   const checkLabel = p.is_completed
     ? 'Plan complete'
     : done
@@ -250,9 +275,20 @@ function cardHtml(p) {
       : ''}
 
     ${exerciseBlock(p)}
+    ${offNote(p)}
 
     <p class="error" data-error role="alert"></p>
+    <div class="plan__actions">
+      <div class="plan__primary">
+        <label class="q-check q-check--lg">
+          <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
+          <span class="q-check__box"></span>
+          <span class="q-check__label">${checkLabel}</span>
+        </label>
+        ${offToggle}
+      </div>
 
+      <div class="plan__links">
     <div class="plan__actions">
       <label class="q-check q-check--lg">
         <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
@@ -265,7 +301,7 @@ function cardHtml(p) {
           ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-edit-toggle>Numbers changed today?</button>'
           : ''}
 
-        ${!done
+        ${!done && !isOff
           ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>'
           : ''}
 
@@ -668,6 +704,29 @@ listEl.addEventListener('click', async (e) => {
 
     return;
   }
+
+  // Add / remove today's off day (athlete plans).
+  const offTap = e.target.closest('[data-off]');
+
+  if (offTap) {
+    const turnOn = offTap.getAttribute('aria-pressed') !== 'true';
+
+    offTap.disabled = true;
+    err.textContent = '';
+
+    try {
+      const r = await api.post(`/plans/${p.user_plan_id}/off-day`, { off: turnOn });
+
+      p.off_day = { ...p.off_day, is_off_today: r.is_off_day_today };
+      replaceCard(p);
+    } catch (ex) {
+      offTap.disabled = false;
+      err.textContent = OFF_ERRORS[ex.message] || errorText(ex.message);
+    }
+
+    return;
+  }
+
 
   // Mark a day as missed; requires a second tap for confirmation.
   const miss = e.target.closest('[data-miss]');

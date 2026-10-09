@@ -89,4 +89,10 @@ export async function initPlans(user) {
   });
   // Newly rendered cards need the reveal animation too.
   document.querySelectorAll('#tpl-grid [data-reveal]').forEach((el) => el.classList.add('is-visible'));
+  const m = location.hash.match(/^#start=([0-9a-f-]{36})$/i);
+  const wanted = m && templates.find((x) => x.id === m[1]);
+  if (wanted) {
+    if (!user) openAuthModal('signup', 'plans.html' + location.hash);
+    else openSetup(wanted);
+  }
 }

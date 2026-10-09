@@ -30,16 +30,14 @@ def _effective_today(start, today, length_days):
     return min(today, end)
 
 
-def _count_window(status_by_date, start, lo, hi):
-    """(completed, possible) for valid days in [lo, hi]."""
+def _count_window(status_by_date, start, lo, hi, off=frozenset()):
+    """(completed, possible). Off days aren't 'possible' unless the athlete trained anyway."""
     lo = max(lo, start)
     if hi < lo:
         return 0, 0
-    possible = (hi - lo).days + 1
-    done = sum(
-        1 for i in range(possible)
-        if status_by_date.get(lo + timedelta(days=i)) == "completed"
-    )
+    days = [lo + timedelta(days=i) for i in range((hi - lo).days + 1)]
+    done = sum(1 for d in days if status_by_date.get(d) == "completed")
+    possible = sum(1 for d in days if d not in off or status_by_date.get(d) == "completed")
     return done, possible
 
 

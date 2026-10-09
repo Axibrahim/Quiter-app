@@ -61,12 +61,26 @@
         <div class="def-list" id="def-list"></div>
       </section>
 
-      <section class="group liquid-glass liquid-glass--panel">
-        <p class="group__label">5 · Your target</p>
+      <section class="group liquid-glass liquid-glass--panel" id="off-group">
+        <p class="group__label">5 · Rest day <span class="optional">Optional</span></p>
+        <div class="style-opts">
+          <label class="style-opt">
+            <input type="radio" name="offday" value="none" checked>
+            <span><strong>I'll add off days myself</strong><small>Tap “Add off day” on your dashboard whenever you need rest.</small></span>
+          </label>
+          <label class="style-opt">
+            <input type="radio" name="offday" value="blue">
+            <span><strong>Let Blue pick my weekly off day</strong><small id="off-hint">Pick your sport and phase and Blue will suggest a day.</small></span>
+          </label>
+        </div>
+      </section>
 
-      <div id="common"></div>
-      <p class="error" id="form-error" role="alert"></p>
-      <button class="btn btn--solid" type="submit" id="submit" style="width:100%">Create my athlete plan</button>
+      <section class="group liquid-glass liquid-glass--panel">
+        <p class="group__label">6 · Your target</p>
+        <div id="common"></div>
+        <p class="error" id="form-error" role="alert"></p>
+        <button class="btn btn--solid" type="submit" id="submit" style="width:100%">Create my athlete plan</button>
+      </section>
     </form>
   </div>
 </main>

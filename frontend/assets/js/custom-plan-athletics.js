@@ -189,6 +189,38 @@ $('custom-rows').addEventListener('click', scheduleGoalHint);   // "Remove" butt
 $('experience').addEventListener('change', scheduleGoalHint);
 $('diet').addEventListener('change', scheduleGoalHint);
 
+// ---- Blue's off-day suggestion ------------------------------------------------
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const offHint = $('off-hint');
+const OFF_DEFAULT_HINT = offHint.textContent;
+let offTimer = null, offSeq = 0;
+
+const offChoice = () => document.querySelector('input[name="offday"]:checked')?.value || 'none';
+
+function scheduleOffHint() {
+  clearTimeout(offTimer);
+  if (offChoice() !== 'blue') return;
+  if (!sport || !currentPhase()) { offHint.textContent = OFF_DEFAULT_HINT; return; }
+  offTimer = setTimeout(fetchOffHint, 600);
+}
+
+async function fetchOffHint() {
+  const seq = ++offSeq;
+  const tracked = [
+    ...[...picked].map((key) => ({ key })),
+    ...customRows()
+      .map((r) => ({ label: r.querySelector('input').value.trim(), metric: r.querySelector('select').value }))
+      .filter((c) => c.label.length >= 2),
+  ];
+  try {
+    const res = await api.post('/plans/off-day-suggestion', { sport: sport.key, phase: currentPhase(), tracked_exercises: tracked });
+    if (seq === offSeq && offChoice() === 'blue') offHint.textContent = `Blue suggests ${WEEKDAYS[res.weekday]}s. ${res.reason}`;
+  } catch { offHint.textContent = 'Blue will pick a day when your plan is created.'; }
+}
+
+document.querySelectorAll('input[name="offday"]').forEach((r) => r.addEventListener('change', scheduleOffHint));
+['sports', 'phases', 'exercises', 'custom-rows'].forEach((id) => $(id).addEventListener('change', scheduleOffHint));
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorEl.textContent = '';
@@ -242,7 +274,7 @@ form.addEventListener('submit', async (e) => {
       phase,
       experience: $('experience').value || undefined,
       diet: $('diet').value || undefined,
-      ...common.read(),
+      ...common.read(), off_day: offChoice(),
     });
     window.location.href = 'dashboard.html';
   } catch (ex) {
