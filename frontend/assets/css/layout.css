@@ -492,15 +492,11 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
 /* ---------- 13. RESPONSIVE ---------------------------------------------- */
 @media (max-width: 860px) {
-  .grid-3, .grid-2, .stats { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(3, 1fr); }
-  .nav__links { display: none; }
-  .nav__toggle { display: inline-flex; }
-  .nav__panel { position: fixed; top: 76px; left: 14px; right: 14px; z-index: 49; padding: .6rem; border-radius: var(--radius-lg); flex-direction: column; gap: .2rem; }
-  .nav__panel.is-open { display: flex; }
-  .nav__panel a { padding: .9rem 1rem; border-radius: var(--radius-md); font-size: 1rem; color: var(--ink-70); }
-  .nav__panel a:hover, .nav__panel a.is-active { background: rgba(255,255,255,.08); color: var(--ink); }
-  .hero { align-items: flex-end; padding-bottom: 8vh; }
+  .bg-video { overflow: hidden; background-size: max(180vw, 62svh) auto; background-position: 55.7% 4svh; }
+  .bg-video video {
+    position: absolute; left: 50%; top: 4svh; transform: translate3d(-52.5%, 0, 0);
+    width: max(180vw, 62svh); height: auto; max-width: none; aspect-ratio: 800 / 856; object-fit: fill;
+  }
 }
 @media (max-width: 560px) {
   :root { --space-4: 1.6rem; --space-5: 3rem; }
@@ -1347,4 +1343,24 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .fc__actual { stroke-width: 3.2; }
   .fc__proj { stroke-width: 2.8; }
   .fc__pt--done, .fc__pt--missed, .fc__pt--off, .fc__pt--partial, .fc__pt--none { r: 4.6; }
+}
+
+
+/* ==== Home: frosted-glass layer + side stars after the first screen ==== */
+.bg-veil {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  opacity: var(--veil, 0); will-change: opacity;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 14%),
+    rgba(8, 8, 14, .20);
+  -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+}
+
+
+@media (max-width: 860px) {
+  .bg-veil { -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }
+}
+.has-veil .site-gl {
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 16%, rgba(0,0,0,var(--keep, 1)) 34%, rgba(0,0,0,var(--keep, 1)) 66%, #000 84%, #000 100%);
+          mask-image: linear-gradient(90deg, #000 0%, #000 16%, rgba(0,0,0,var(--keep, 1)) 34%, rgba(0,0,0,var(--keep, 1)) 66%, #000 84%, #000 100%);
 }
