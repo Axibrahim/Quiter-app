@@ -4,10 +4,15 @@ Admin routes — /api/v1/admin/*
 Every route requires BOTH a valid session (login_required) AND the
 is_admin flag (admin_required) — a regular logged-in user gets a clean
 403, never access to these endpoints.
+
+Admins manage ONLY the default (ready-made) plans shown on the site, at most
+MAX_DEFAULT_PLANS of them. Plans that users build for themselves (custom and
+athlete plans) are stored as hidden templates too, but they are never listed,
+read, edited or deleted from here: they stay private to their owner.
 """
 from flask import Blueprint, request, jsonify
 
-from app.models.models import db, PlanTemplate
+from app.models.models import db, PlanTemplate, PlanDay, UserPlan, gen_uuid
 from app.security.session_auth import login_required
 from app.security.admin_auth import admin_required
 from app.utils.validation import validate_uuid_param
@@ -16,6 +21,28 @@ from app.utils.supabase_storage import upload_plan_photo, SupabaseStorageError
 admin_bp = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
 
 VALID_DIRECTIONS = {"break", "build"}
+MAX_DEFAULT_PLANS = 6
+
+# plans.py creates a hidden template for every user-built plan with one of these
+# slug prefixes. They belong to users, so admins can't see or touch them, and an
+# admin can't create a default plan whose slug looks like one.
+USER_SLUG_PREFIXES = ("custom-", "athletic-")
+
+
+def _default_templates_query():
+    """Active, admin-managed default plans (everything the site shows publicly)."""
+    query = PlanTemplate.query.filter(PlanTemplate.is_active.is_(True))
+    for prefix in USER_SLUG_PREFIXES:
+        query = query.filter(~PlanTemplate.slug.startswith(prefix))
+    return query
+
+
+def _get_default_template(template_id):
+    """The template, or None if it doesn't exist or isn't an admin-managed default plan."""
+    template = db.session.get(PlanTemplate, template_id)
+    if template is None or not template.is_active or template.slug.startswith(USER_SLUG_PREFIXES):
+        return None
+    return template
 
 
 def _serialize_template(t):
@@ -52,6 +79,8 @@ def _read_template_payload(payload, partial=False):
         slug = (payload.get("slug") or "").strip().lower()
         if not slug or len(slug) > 80 or not all(c.isalnum() or c == "-" for c in slug):
             return None, "invalid_slug"
+        if slug.startswith(USER_SLUG_PREFIXES):
+            return None, "reserved_slug"
         fields["slug"] = slug
 
     if "identity_statement" in payload or not partial:
@@ -136,11 +165,8 @@ def _read_template_payload(payload, partial=False):
             return None, "invalid_is_included"
         fields["is_included"] = is_included
 
-    if "is_active" in payload:
-        is_active = payload.get("is_active")
-        if not isinstance(is_active, bool):
-            return None, "invalid_is_active"
-        fields["is_active"] = is_active
+    # is_active is intentionally NOT read from the payload: a default plan is either
+    # live (it exists) or deleted (DELETE below). There is no "hidden draft" state.
 
     return fields, None
 
@@ -149,9 +175,9 @@ def _read_template_payload(payload, partial=False):
 @login_required
 @admin_required
 def list_all_templates():
-    """Unlike the public /plans/templates route, this returns every
-    template regardless of is_active, so admins can see drafts too."""
-    templates = PlanTemplate.query.order_by(PlanTemplate.created_at.desc()).all()
+    """The default plans shown on the site (max 6). Users' own plans are never
+    included, even though they live in the same table."""
+    templates = _default_templates_query().order_by(PlanTemplate.created_at.asc()).all()
     return jsonify([_serialize_template(t) for t in templates]), 200
 
 
@@ -164,9 +190,13 @@ def create_template():
     if error:
         return jsonify({"error": error}), 400
 
+    if _default_templates_query().count() >= MAX_DEFAULT_PLANS:
+        return jsonify({"error": "max_default_plans", "max": MAX_DEFAULT_PLANS}), 409
+
     if PlanTemplate.query.filter_by(slug=fields["slug"]).first():
         return jsonify({"error": "slug_already_exists"}), 409
 
+    fields["is_active"] = True
     template = PlanTemplate(**fields)
     db.session.add(template)
     db.session.commit()
@@ -180,7 +210,7 @@ def update_template(template_id):
     if not validate_uuid_param(template_id):
         return jsonify({"error": "invalid_id"}), 400
 
-    template = db.session.get(PlanTemplate, template_id)
+    template = _get_default_template(template_id)
     if template is None:
         return jsonify({"error": "template_not_found"}), 404
 
@@ -204,16 +234,26 @@ def update_template(template_id):
 @login_required
 @admin_required
 def delete_template(template_id):
-    """Soft-delete: flips is_active off rather than removing the row,
-    since UserPlan rows may still reference this template's history."""
+    """Delete a default plan so it disappears from the site and frees a slot.
+
+    If nobody has ever started it, the row is removed completely. If users
+    already started it, the row is retired instead (inactive, slug freed) so
+    their own plans and history keep working."""
     if not validate_uuid_param(template_id):
         return jsonify({"error": "invalid_id"}), 400
 
-    template = db.session.get(PlanTemplate, template_id)
+    template = _get_default_template(template_id)
     if template is None:
         return jsonify({"error": "template_not_found"}), 404
 
-    template.is_active = False
+    in_use = UserPlan.query.filter_by(template_id=template.id).first() is not None
+    if in_use:
+        template.is_active = False
+        template.slug = f"deleted-{gen_uuid()[:8]}"
+    else:
+        PlanDay.query.filter_by(template_id=template.id).delete()
+        db.session.delete(template)
+
     db.session.commit()
     return jsonify({"ok": True}), 200
 

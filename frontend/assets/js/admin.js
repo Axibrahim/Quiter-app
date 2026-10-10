@@ -1,7 +1,12 @@
 import { api } from './modules/api-client.js';
 
+// Admins manage ONLY the default plans shown on the site (max 6).
+// Users' own plans are private and never appear on this page.
+const MAX_DEFAULT_PLANS = 6;
+
 let editingId = null;
 let uploadedPhotoUrl = '';
+let planCount = 0;
 
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -25,13 +30,12 @@ function fieldsFromForm() {
     trial_days: document.getElementById('tpl-trial').value
       ? Number(document.getElementById('tpl-trial').value)
       : null,
-    is_active: document.getElementById('tpl-active').checked,
     tagline: document.getElementById('tpl-tagline').value.trim() || null,
     cta_text: document.getElementById('tpl-cta').value.trim() || null,
     age_rating: document.getElementById('tpl-age-rating').value.trim() || null,
     is_included: document.getElementById('tpl-included').checked,
   };
-    };
+}
 
 function fillForm(template) {
   document.getElementById('tpl-title').value = template.title || '';
@@ -43,7 +47,6 @@ function fillForm(template) {
   document.getElementById('tpl-description').value = template.description || '';
   document.getElementById('tpl-price').value = template.price_cents != null ? (template.price_cents / 100).toFixed(2) : '';
   document.getElementById('tpl-trial').value = template.trial_days != null ? template.trial_days : '';
-  document.getElementById('tpl-active').checked = template.is_active !== false;
   document.getElementById('tpl-tagline').value = template.tagline || '';
   document.getElementById('tpl-cta').value = template.cta_text || '';
   document.getElementById('tpl-age-rating').value = template.age_rating || '';
@@ -71,6 +74,10 @@ function resetForm() {
 }
 
 function openForm(template) {
+  if (!template && planCount >= MAX_DEFAULT_PLANS) {
+    alert(`You already have ${MAX_DEFAULT_PLANS} default plans. Delete one to add a new one.`);
+    return;
+  }
   resetForm();
   if (template) {
     editingId = template.id;
@@ -84,6 +91,17 @@ function openForm(template) {
 function closeForm() {
   document.getElementById('template-form-panel').style.display = 'none';
   resetForm();
+}
+
+// "+ New plan (3/6)" — disabled once all 6 slots are used.
+function updateNewButton() {
+  const btn = document.getElementById('new-template-btn');
+  if (!btn) return;
+  const full = planCount >= MAX_DEFAULT_PLANS;
+  btn.disabled = full;
+  btn.textContent = full
+    ? `All ${MAX_DEFAULT_PLANS} slots used`
+    : `+ New plan (${planCount}/${MAX_DEFAULT_PLANS})`;
 }
 
 function renderAdminCard(template) {
@@ -104,15 +122,14 @@ function renderAdminCard(template) {
       <p>"${escapeHtml(template.identity_statement)}"</p>
       <div class="admin-card__meta">
         <span>${template.length_days} days</span>
-        <span>${template.is_active ? 'Active' : 'Hidden'}</span>
+        <span>${template.price_cents != null ? `$${(template.price_cents / 100).toFixed(2)}` : 'Free'}</span>
       </div>
       <div class="admin-card__meta">
-        <span>${template.price_cents != null ? `$${(template.price_cents / 100).toFixed(2)}` : 'Free'}</span>
         <span>${template.trial_days ? `${template.trial_days}-day trial` : 'No trial'}</span>
       </div>
       <div class="admin-card__row">
         <button class="btn btn--glass liquid-glass btn--sm" data-edit type="button">Edit</button>
-        <button class="btn btn--glass liquid-glass btn--sm" data-delete type="button">${template.is_active ? 'Hide' : 'Hidden'}</button>
+        <button class="btn btn--glass liquid-glass btn--sm" data-delete type="button">Delete</button>
       </div>
     </div>
   `;
@@ -126,26 +143,32 @@ async function loadTemplates() {
   const loading = document.getElementById('admin-loading');
   const grid = document.getElementById('admin-template-grid');
   loading.style.display = '';
+  loading.textContent = 'Loading default plans…';
   grid.innerHTML = '';
 
   try {
     const templates = await api.get('/admin/templates');
+    planCount = templates.length;
+    updateNewButton();
+    if (!templates.length) {
+      loading.textContent = 'No default plans yet. Use “+ New plan” to add one.';
+      return;
+    }
     loading.style.display = 'none';
     templates.forEach((t) => grid.appendChild(renderAdminCard(t)));
   } catch (err) {
-    loading.textContent = `Couldn't load plan templates (${err.message}).`;
+    loading.textContent = `Couldn't load default plans (${err.message}).`;
   }
 }
 
 async function handleDelete(template) {
-  if (!template.is_active) return;
-  if (!confirm(`Hide "${template.title}" from the public catalog?`)) return;
+  if (!confirm(`Delete "${template.title}"? It will disappear from the home page and the Plans page. People who already started it keep their own plan.`)) return;
 
   try {
     await api.delete(`/admin/templates/${template.id}`);
     await loadTemplates();
   } catch (err) {
-    alert(`Couldn't hide plan: ${err.message}`);
+    alert(`Couldn't delete plan: ${err.message}`);
   }
 }
 
