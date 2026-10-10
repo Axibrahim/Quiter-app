@@ -316,9 +316,22 @@ const FC_STATUS = {
   finished: ['Plan finished', 'info']
 };
 
-const SVG_W = 480;
-const SVG_H = 230;
-const PAD = { l: 34, r: 12, t: 14, b: 26 };
+// Chart size follows the screen: a phone gets a narrower viewBox so text isn't shrunk to ~6px.
+const phoneMQ = window.matchMedia('(max-width: 560px)');
+let SVG_W = 480;
+let SVG_H = 230;
+let PAD = { l: 34, r: 12, t: 14, b: 26 };
+
+function sizeChart() {
+  if (phoneMQ.matches) {
+    SVG_W = 340; SVG_H = 250; PAD = { l: 30, r: 10, t: 14, b: 26 };
+  } else {
+    SVG_W = 480; SVG_H = 230; PAD = { l: 34, r: 12, t: 14, b: 26 };
+  }
+}
+
+// Rotate / resize across the phone breakpoint: redraw the graphs.
+phoneMQ.addEventListener('change', () => plans.forEach((p) => paintInsights(p)));
 
 const num1 = (v) => fmtNum(Math.round(Number(v) * 10) / 10);
 
@@ -352,6 +365,7 @@ function axes(s, xMax, yMin, yMax) {
 }
 
 function daysChart(c) {
+  sizeChart();
   const n = c.total_days;
   const top = Math.max(c.possible_total, 1);
   const s = makeScale(n, 0, top);
@@ -385,6 +399,7 @@ function daysChart(c) {
 }
 
 function exerciseChart(c, e) {
+  sizeChart();
   const n = c.total_days;
   const f = e.fit;
   const vals = [

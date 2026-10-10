@@ -1270,3 +1270,47 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .site-footer__panel { grid-template-columns: 1fr 1fr; padding: var(--space-3); }
   .site-footer__brand { grid-column: 1 / -1; }
 }
+
+/* ==== Insights: phone pass ==== */
+.dashboard-insights, .fc, .ins-chart, .ins-tile { min-width: 0; }
+
+@media (max-width: 560px) {
+  .dashboard-insights { padding: .9rem; }
+  .dashboard-insights__list { gap: .75rem; }
+
+  /* graph card */
+  .fc, .ins-chart { padding: .8rem .75rem; }
+  .fc__blue { font-size: .9rem; }
+  .fc__axes text { font-size: 11px; }
+  .fc__goal-t { font-size: 11px; }
+  .fc__end-t { font-size: 12px; }
+
+  /* graph tabs: edge-to-edge swipe row */
+  .fc__tabs {
+    margin-inline: -.75rem; padding-inline: .75rem;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  }
+  .fc__tab { min-height: 2.5rem; scroll-snap-align: start; }
+
+  /* legend + stats: compact, 2 columns */
+  .fc__legend { gap: .3rem .85rem; font-size: .7rem; }
+  .fc__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .fc__stat { padding: .55rem .65rem; }
+  .fc__stat dt { font-size: .6rem; letter-spacing: .08em; }
+  .fc__stat dd { font-size: .88rem; overflow-wrap: anywhere; }
+
+  /* 3 tiles: labels must not overflow */
+  .ins-tile__label { font-size: .56rem; letter-spacing: .06em; overflow-wrap: anywhere; }
+  .ins-tile__value { font-size: 1rem; }
+  .ins-text { font-size: .88rem; }
+
+  /* weekly bars: 8 columns in ~280px */
+  .insight-chart { gap: .2rem; }
+  .insight-chart__value { font-size: .54rem; letter-spacing: -.03em; }
+  .insight-chart__label { font-size: .5rem; }
+}
+
+@media (max-width: 400px) {
+  /* show every other date so labels don't collide */
+  .insight-chart__week:nth-child(even) .insight-chart__label { visibility: hidden; }
+}
