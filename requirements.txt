@@ -1,1 +1,14 @@
--r backend/requirements.txt
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Limiter==3.8.0
+Flask-Talisman==1.1.0
+SQLAlchemy==2.0.35
+psycopg2-binary==2.9.12
+argon2-cffi==23.1.0
+gunicorn==22.0.0
+redis==5.0.8
+python-dotenv==1.0.1
+Flask-Cors==4.0.1
+resend==2.4.0
+requests==2.32.3
+tzdata==2026.5
