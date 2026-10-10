@@ -34,7 +34,9 @@ CONTENT_SECURITY_POLICY = {
     ],
     "img-src": ["'self'", "data:", "https://downloads.getlayers.ai", "https://*.supabase.co"],
     "media-src": ["'self'", "https://downloads.getlayers.ai", "https://*.supabase.co"],  # background video + Supabase videos
-    "connect-src": ["'self'"],           # fetch()/XHR targets — API only, no exfil to third parties
+    # fetch()/XHR targets — API only, no exfil to third parties. The two Google Fonts hosts are
+    # here ONLY because the service worker (sw.js) fetches fonts to cache them for offline use.
+    "connect-src": ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
     "worker-src": ["'self'", "blob:"],   # Three.js may spin workers for decoding
     "object-src": "'none'",              # blocks Flash/legacy plugin vectors entirely
     "base-uri": "'self'",                # blocks <base> tag hijack of relative URLs

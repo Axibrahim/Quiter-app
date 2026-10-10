@@ -29,6 +29,7 @@ function renderNav(user, active, offline = false) {
   const right = offline ? ''
     : user
     ? `${user.is_admin ? '<a class="btn btn--text btn--sm" href="admin.html">Admin</a>' : ''}
+       <a class="btn btn--solid btn--sm nav__dash" href="dashboard.html">Dashboard</a>
        <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${(user.display_name || 'Me').split(' ')[0]}</a>`
     : `<button class="btn btn--text btn--sm" type="button" data-open-auth="login">Log in</button>
        <button class="btn btn--solid btn--sm" type="button" data-open-auth="signup">Get started</button>`;
@@ -42,14 +43,15 @@ function renderNav(user, active, offline = false) {
         <nav class="nav__links" aria-label="Main">${links}</nav>
       </div>
       <div class="nav__right">${right}
-        <button class="icon-btn nav__toggle" type="button" aria-label="Menu" aria-expanded="false">☰</button>
+        ${user ? '' : '<button class="icon-btn nav__toggle" type="button" aria-label="Menu" aria-expanded="false">☰</button>'}
       </div>
     </div>
-    <nav class="nav__panel liquid-glass liquid-glass--panel" aria-label="Mobile">${links}</nav>`;
+        ${user ? '' : `<nav class="nav__panel liquid-glass liquid-glass--panel" aria-label="Mobile">${links}</nav>`}`;
   document.body.prepend(nav);
 
   const toggle = nav.querySelector('.nav__toggle');
   const panel = nav.querySelector('.nav__panel');
+  if (!toggle || !panel) return;   // signed-in users get Dashboard buttons instead of the dropdown
   toggle.addEventListener('click', () => {
     const open = panel.classList.toggle('is-open');
     toggle.setAttribute('aria-expanded', String(open));

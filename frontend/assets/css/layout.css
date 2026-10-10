@@ -1249,6 +1249,13 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   background: var(--accent-violet); box-shadow: 0 0 10px var(--accent-violet); }
 .tips.is-loading .tips__list li { height: 1.1rem; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.2), rgba(255,255,255,.08)); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
 
+/* ---------- 15. NAV FIXES */
+.nav__panel { pointer-events: auto; }
+.nav__dash { display: none; }
+@media (max-width: 860px) {
+  .nav__dash { display: inline-flex; }
+}
+
 /* ---------- 14. SITE FOOTER (injected by shell.js) ---------------------- */
 .site-footer { width: 100%; max-width: var(--max-width); margin: var(--space-5) auto 0; padding: 0 var(--space-3) calc(var(--space-4) + var(--safe-bottom)); }
 .site-footer__panel { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: var(--space-4); padding: var(--space-4); border-radius: var(--radius-lg); }
