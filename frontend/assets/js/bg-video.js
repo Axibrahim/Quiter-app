@@ -9,13 +9,25 @@
  *   down to a stop instead of freezing.
  * - The clip loops seamlessly (first and last frame match).
  *
- * Tune the feel with the four constants below.
+ * Smoothness notes (why slow swipes used to look "rough"):
+ *   1. playbackRate was rewritten on every frame; browsers re-sync the media clock each time.
+ *      It is now quantised and only written when it really changes.
+ *   2. Very low rates on a 30fps clip show each source frame for ~100ms = stutter. The clips are
+ *      now 60fps (motion-interpolated) and the slowest playing speed is MIN_RATE.
+ *   3. play()/pause() flapped near zero speed. Start/stop now use two different thresholds.
+ *
+ * Tune the feel with the constants below.
  */
+import { initSiteGL } from './site-gl.js';
+
 const PX_PER_SECOND_FOR_1X = 900;   // scroll speed (px/s) that plays the video at normal speed
-const MIN_RATE = 0.35;              // slowest playback while you're moving
+const MIN_RATE = 0.6;               // slowest playback while you're moving (60fps clip => >=36 visible fps)
 const MAX_RATE = 3;                 // fastest playback on a hard flick
-const HOLD_MS = 180;                // keep full speed this long after the last movement...
+const HOLD_MS = 220;                // keep full speed this long after the last movement...
 const FADE_TAU_MS = 170;            // ...then ease out (total tail ≈ 0.5s)
+const START_RATE = 0.3;             // start playing above this smoothed rate
+const STOP_RATE = 0.2;              // pause only when it eases below this (gap = no start/stop flapping)
+const RATE_STEP = 0.05;             // playbackRate is rounded to this and only written when it changes by a step
 
 export function initBackground() {
   if (document.querySelector('.bg-video')) return;
@@ -33,6 +45,10 @@ export function initBackground() {
   document.body.prepend(scrim);
   document.body.prepend(wrap);
 
+  // Stars layer (three.js) on every page; loaded when the browser is idle so it never delays first paint.
+  if ('requestIdleCallback' in window) requestIdleCallback(() => initSiteGL(), { timeout: 3000 });
+  else setTimeout(() => initSiteGL(), 1500);
+
   // Reduced motion: just the still frame, and don't download the video at all.
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -43,7 +59,9 @@ export function initBackground() {
   video.preload = 'auto';
   video.setAttribute('muted', '');
   video.setAttribute('playsinline', '');
-  video.src = small ? 'assets/media/glass-flower-mobile.mp4' : 'assets/media/glass-flower.mp4';
+  video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
+  video.src = small ? 'assets/media/glass-flower-mobile-60.mp4' : 'assets/media/glass-flower-60.mp4';
   // Once the first frame is decoded, the black page takes over from the poster
   // (otherwise the poster would peek out around the edges when the clip is shifted/scaled).
   video.addEventListener('loadeddata', () => wrap.classList.add('is-ready'));   // CSS then hides the poster
@@ -87,6 +105,15 @@ export function initBackground() {
     video.pause();
   }
 
+  let appliedRate = 1;
+  function setRate(r) {
+    const q = Math.min(MAX_RATE, Math.max(0.0625, Math.round(r / RATE_STEP) * RATE_STEP));
+    if (Math.abs(q - appliedRate) >= RATE_STEP - 1e-6) {   // skip tiny changes: no clock re-sync every frame
+      video.playbackRate = q;
+      appliedRate = q;
+    }
+  }
+
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.max(1, Math.min(now - lastFrameAt, 100));
@@ -96,7 +123,7 @@ export function initBackground() {
     if (pendingPx > 0) {
       const pxPerSec = (pendingPx / dt) * 1000;
       const target = Math.min(MAX_RATE, Math.max(MIN_RATE, pxPerSec / PX_PER_SECOND_FOR_1X));
-      drive += (target - drive) * 0.35;          // follow the swipe speed
+      drive += (target - drive) * 0.2;           // follow the swipe speed (gentle: steadier slow swipes)
       lastInputAt = now;
       pendingPx = 0;
     } else if (now - lastInputAt > HOLD_MS) {
@@ -105,9 +132,9 @@ export function initBackground() {
 
     rate += (drive - rate) * (1 - Math.exp(-dt / 70));   // smooth start/stop of the rate itself
 
-    if (rate > 0.06) {
+    if (rate > START_RATE || (playing && rate > STOP_RATE)) {
       start();
-      video.playbackRate = Math.min(MAX_RATE, Math.max(0.0625, rate));
+      setRate(rate);
     } else {
       drive = 0;
       stop();

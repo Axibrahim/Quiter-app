@@ -10,7 +10,10 @@
   position: fixed; inset: 0; z-index: -2; background: #000;
   background-position: 60% 50%; background-size: cover; background-repeat: no-repeat;
 }
-.bg-video video { width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%; }
+.bg-video { contain: paint; }   /* the moving video never forces the rest of the page to repaint */
+.bg-video video { width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%;
+  will-change: transform; backface-visibility: hidden; transform: translate3d(0, 0, 0); }
+
 .bg-video video {
   opacity: 0;
   transition: opacity 350ms ease;
@@ -23,7 +26,7 @@
 
 /* The clip's edges are pure black, so sliding it right on wide screens moves the
    flower out from behind the headline without any visible seam. */
-@media (min-width: 861px) { .bg-video video { transform: translateX(17vw); } }
+@media (min-width: 861px) { .bg-video video { transform: translate3d(17vw, 0, 0); } }
 .bg-scrim {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
@@ -595,7 +598,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 @media (max-width: 860px) {
   .bg-video { overflow: hidden; background-size: auto 78vh; background-position: 50% 0; }
   .bg-video video {
-    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    position: absolute; left: 50%; top: 0; transform: translate3d(-50%, 0, 0);
     width: auto; height: 78vh; max-width: none; aspect-ratio: 800 / 855; object-fit: fill;
   }
 }
@@ -763,7 +766,13 @@ html { -webkit-text-size-adjust: 100%; }
 /* ==== Home: plans spotlight ==== */
 html.is-locked { overflow: hidden; }
 .showcase { position: relative; overflow: hidden; }
-.showcase__gl { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.showcase__bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .8s ease;
+  background: var(--showcase-bg, none) center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%); }
+.showcase__bg::after { content: ''; position: absolute; inset: 0;   /* keeps the cards and text readable on any picture */
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.15) 45%, rgba(0,0,0,.55)); }
+.showcase.has-bg .showcase__bg { opacity: 1; }
 .showcase > .wrap, .showcase > .spot, .showcase > .spot__dots { position: relative; z-index: 1; }
 
 .spot { --card-w: clamp(250px, 70vw, 340px); --card-h: clamp(380px, 58vh, 450px); --gap: 1.25rem; position: relative; }
@@ -1313,4 +1322,18 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 @media (max-width: 400px) {
   /* show every other date so labels don't collide */
   .insight-chart__week:nth-child(even) .insight-chart__label { visibility: hidden; }
+}
+
+/* ==== Site-wide stars (three.js, created by site-gl.js) ==== */
+.site-gl { position: fixed; top: 0; left: 0; width: 100%; height: 100%; height: 100lvh;
+  z-index: -1; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+.site-gl.is-on { opacity: 1; }
+
+/* ==== Phones: lighter blur so the moving video behind glass stays smooth ==== */
+@media (max-width: 860px) {
+  .liquid-glass { -webkit-backdrop-filter: blur(8px) saturate(125%); backdrop-filter: blur(8px) saturate(125%); }
+  .liquid-glass--panel { -webkit-backdrop-filter: blur(12px) saturate(130%); backdrop-filter: blur(12px) saturate(130%); }
+  .nav__pill { -webkit-backdrop-filter: blur(12px) saturate(130%); backdrop-filter: blur(12px) saturate(130%); }
+  .dashboard-insights { -webkit-backdrop-filter: blur(10px) saturate(125%); backdrop-filter: blur(10px) saturate(125%); }
+  .spot-card.liquid-glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

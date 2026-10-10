@@ -4,6 +4,7 @@
  * blurred detail view (photo left / text right on desktop, photo on top on phones).
  */
 import { api } from './modules/api-client.js';
+import { setGLAccent, pulseGL } from './site-gl.js';   // the stars now live site-wide (site-gl.js)
 
 const CURRENCY = 'USD';   // used only when an admin sets a price
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -12,7 +13,7 @@ const isUrl = (u) => /^https?:\/\//i.test(u || '');
 
 let templates = [], items = [], dotEls = [];
 let track, overlay, prevBtn, nextBtn;
-let active = -1, openIndex = -1, gl = null, raf = 0;
+let active = -1, openIndex = -1, raf = 0;
 
 const price = (t) => {
   if (t.is_included) return 'Included';
@@ -83,7 +84,7 @@ function markActive(i) {
   dotEls.forEach((el, k) => { el.classList.toggle('is-on', k === i); k === i ? el.setAttribute('aria-current', 'true') : el.removeAttribute('aria-current'); });
   prevBtn.disabled = i === 0;
   nextBtn.disabled = i === items.length - 1;
-  gl?.setAccent(i);
+  setGLAccent(i);
 }
 
 function centerOn(i, instant = false) {
@@ -112,7 +113,7 @@ function openPanel(i) {
   panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur * 0.35, easing: 'ease-out' });
 
   openIndex = i;
-  gl?.pulse();
+  pulseGL();
   panel.querySelector('[data-close]').focus({ preventScroll: true });
 }
 
@@ -133,6 +134,23 @@ function closePanel() {
     card.focus({ preventScroll: true });
   };
 }
+
+
+// ---- section background image ------------------------------------------------
+function setShowcaseBg(section) {
+  const src = (section.dataset.bg || '').trim();
+  const bg = section.querySelector('.showcase__bg');
+  if (!src || !bg) return;
+  if (!/^(https?:\/\/|assets\/|\.?\/)/i.test(src)) return;   // local file or https only
+  const img = new Image();
+  img.onload = () => {
+    bg.style.setProperty('--showcase-bg', `url(${JSON.stringify(src)})`);
+    section.classList.add('has-bg');   // fades the image in once it has loaded
+  };
+  img.src = src;
+}
+
+
 
 // ---- init ---------------------------------------------------------------------
 export async function initHomePlans() {
@@ -195,16 +213,7 @@ export async function initHomePlans() {
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   });
-
-  // three.js ambient layer: loaded only when the section is near the viewport.
-  const io = new IntersectionObserver((entries) => {
-    if (!entries.some((en) => en.isIntersecting)) return;
-    io.disconnect();
-    if (reduce) return;
-    import('./home-plans-3d.js')
-      .then((m) => m.initShowcaseGL(document.getElementById('showcase-gl'), section, track))
-      .then((g) => { gl = g; gl?.setAccent(Math.max(active, 0)); })
-      .catch(() => {});
-  }, { rootMargin: '300px' });
-  io.observe(section);
+  
+  // Background image for this section. Set it in index.html: <section id="plans-showcase" data-bg="assets/media/plans-bg.jpg">
+  setShowcaseBg(section);
 }

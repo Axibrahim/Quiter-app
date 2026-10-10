@@ -23,7 +23,7 @@
  */
 
 /* VERSION:start */
-const VERSION = 'cdd4370b45';
+const VERSION = 'd4f2b8893b';
 /* VERSION:end */
 
 /* PRECACHE:start */
@@ -37,7 +37,6 @@ const PRECACHE = [
   'assets/js/custom-plan-athletics.js',
   'assets/js/custom-plan.js',
   'assets/js/dashboard.js',
-  'assets/js/home-plans-3d.js',
   'assets/js/home-plans.js',
   'assets/js/modules/api-client.js',
   'assets/js/modules/auth-modal.js',
@@ -50,6 +49,7 @@ const PRECACHE = [
   'assets/js/progress.js',
   'assets/js/pwa.js',
   'assets/js/reset-password.js',
+  'assets/js/site-gl.js',
   'assets/js/verify.js',
   'assets/media/glass-flower-mobile-poster.jpg',
   'assets/media/glass-flower-poster.jpg',
