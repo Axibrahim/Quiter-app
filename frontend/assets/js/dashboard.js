@@ -261,8 +261,8 @@ function coverInsight(p) {
   </div>`;
 }
 
-// Full insight view, shown in the Insights tab.
-function insightsHtml(p) {
+// Weekly numbers view (the original Insights tab content).
+function weeklyInsightsHtml(p) {
   const a = p._an;
 
   if (a === undefined) return '<p class="pane-empty">Loading your progress…</p>';
@@ -301,6 +301,212 @@ function insightsHtml(p) {
 }
 
 /* ------------------------------------------------------------- the card */
+
+// Insights tab = Blue's forecast graph on top, weekly numbers below.
+const insightsHtml = (p) => forecastHtml(p) + weeklyInsightsHtml(p);
+
+/* ------------------------------------------------ goal forecast (Insights tab) */
+
+const FC_STATUS = {
+  ahead: ['Ahead of pace', 'good'],
+  on_track: ['On track', 'good'],
+  behind: ['Slightly behind', 'warn'],
+  at_risk: ['At risk', 'risk'],
+  early: ['Early estimate', 'info'],
+  finished: ['Plan finished', 'info']
+};
+
+const SVG_W = 480;
+const SVG_H = 230;
+const PAD = { l: 34, r: 12, t: 14, b: 26 };
+
+const num1 = (v) => fmtNum(Math.round(Number(v) * 10) / 10);
+
+function makeScale(xMax, yMin, yMax) {
+  const iw = SVG_W - PAD.l - PAD.r;
+  const ih = SVG_H - PAD.t - PAD.b;
+  const span = yMax - yMin || 1;
+
+  return {
+    x: (v) => PAD.l + (v / xMax) * iw,
+    y: (v) => PAD.t + ih - ((v - yMin) / span) * ih
+  };
+}
+
+const line = (pts, s) => pts
+  .map(([x, y], i) => `${i ? 'L' : 'M'}${s.x(x).toFixed(1)} ${s.y(y).toFixed(1)}`)
+  .join('');
+
+const bandPath = (up, lo, s) => `${line(up, s)}${[...lo].reverse()
+  .map(([x, y]) => `L${s.x(x).toFixed(1)} ${s.y(y).toFixed(1)}`).join('')}Z`;
+
+function axes(s, xMax, yMin, yMax) {
+  const ys = [yMin, (yMin + yMax) / 2, yMax];
+  const xs = [1, Math.round(xMax / 2), xMax];
+
+  return `<g class="fc__axes">
+    ${ys.map((v) => `<line x1="${PAD.l}" x2="${SVG_W - PAD.r}" y1="${s.y(v).toFixed(1)}" y2="${s.y(v).toFixed(1)}"/>
+      <text x="${PAD.l - 6}" y="${(s.y(v) + 4).toFixed(1)}" text-anchor="end">${num1(v)}</text>`).join('')}
+    ${xs.map((v) => `<text x="${s.x(v).toFixed(1)}" y="${SVG_H - 6}" text-anchor="middle">Day ${v}</text>`).join('')}
+  </g>`;
+}
+
+function daysChart(c) {
+  const n = c.total_days;
+  const top = Math.max(c.possible_total, 1);
+  const s = makeScale(n, 0, top);
+  const p = c.projection;
+  const cum = new Map(c.actual);
+  const last = c.actual[c.actual.length - 1];
+  const g = c.goal;
+
+  const dots = n <= 45
+    ? c.days
+      .filter((d) => cum.has(d.d) && ['done', 'missed', 'partial', 'off', 'none'].includes(d.s))
+      .map((d) => `<circle class="fc__pt fc__pt--${d.s}" cx="${s.x(d.d).toFixed(1)}" cy="${s.y(cum.get(d.d)).toFixed(1)}" r="3.6"/>`)
+      .join('')
+    : '';
+
+  return `<svg class="fc__svg" viewBox="0 0 ${SVG_W} ${SVG_H}" role="img"
+      aria-label="${esc(`Marked ${num1(c.marked)} of ${c.possible_total} days. Blue projects about ${num1(c.final)}.`)}">
+    ${axes(s, n, 0, top)}
+    <line class="fc__goal" x1="${PAD.l}" x2="${SVG_W - PAD.r}" y1="${s.y(g.target_days).toFixed(1)}" y2="${s.y(g.target_days).toFixed(1)}"/>
+    <text class="fc__goal-t" x="${PAD.l + 4}" y="${(s.y(g.target_days) - 4).toFixed(1)}">${g.target_pct}% goal</text>
+    ${p ? `<path class="fc__band" d="${bandPath(p.high, p.low, s)}"/>` : ''}
+    <path class="fc__ideal" d="${line(c.ideal, s)}"/>
+    <path class="fc__area" d="${line(c.actual, s)}L${s.x(last[0]).toFixed(1)} ${s.y(0).toFixed(1)}L${s.x(0).toFixed(1)} ${s.y(0).toFixed(1)}Z"/>
+    <path class="fc__actual" pathLength="1" d="${line(c.actual, s)}"/>
+    ${p ? `<path class="fc__proj" d="${line(p.mid, s)}"/>` : ''}
+    ${c.finished ? '' : `<line class="fc__today" x1="${s.x(c.day).toFixed(1)}" x2="${s.x(c.day).toFixed(1)}" y1="${PAD.t}" y2="${SVG_H - PAD.b}"/>`}
+    ${dots}
+    ${p ? `<circle class="fc__end" cx="${s.x(n).toFixed(1)}" cy="${s.y(c.final).toFixed(1)}" r="4.5"/>
+      <text class="fc__end-t" x="${(s.x(n) - 8).toFixed(1)}" y="${(s.y(c.final) - 8).toFixed(1)}" text-anchor="end">≈${num1(c.final)}</text>` : ''}
+  </svg>`;
+}
+
+function exerciseChart(c, e) {
+  const n = c.total_days;
+  const f = e.fit;
+  const vals = [
+    ...e.points.map((pt) => pt[1]),
+    ...(f ? [f.end[1]] : []),
+    ...(e.target != null ? [e.target] : [])
+  ];
+
+  let lo = Math.min(...vals);
+  let hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.15 || hi * 0.1 || 1;
+
+  lo = Math.max(0, lo - pad);
+  hi += pad;
+
+  const s = makeScale(n, lo, hi);
+
+  return `<svg class="fc__svg" viewBox="0 0 ${SVG_W} ${SVG_H}" role="img"
+      aria-label="${esc(`${e.label} numbers over the plan`)}">
+    ${axes(s, n, lo, hi)}
+    ${e.target != null ? `<line class="fc__goal" x1="${PAD.l}" x2="${SVG_W - PAD.r}" y1="${s.y(e.target).toFixed(1)}" y2="${s.y(e.target).toFixed(1)}"/>
+      <text class="fc__goal-t" x="${PAD.l + 4}" y="${(s.y(e.target) - 4).toFixed(1)}">${num1(e.target)} ${esc(e.unit)} goal</text>` : ''}
+    ${f ? `<path class="fc__actual" pathLength="1" d="${line([f.first, f.last], s)}"/>
+      <path class="fc__proj" d="${line([f.last, f.end], s)}"/>` : ''}
+    ${e.points.map(([d, v]) => `<circle class="fc__pt fc__pt--done" cx="${s.x(d).toFixed(1)}" cy="${s.y(v).toFixed(1)}" r="3.6"/>`).join('')}
+    ${f ? `<circle class="fc__end" cx="${s.x(f.end[0]).toFixed(1)}" cy="${s.y(f.end[1]).toFixed(1)}" r="4.5"/>
+      <text class="fc__end-t" x="${(s.x(f.end[0]) - 8).toFixed(1)}" y="${(s.y(f.end[1]) - 8).toFixed(1)}" text-anchor="end">≈${num1(f.end[1])}</text>` : ''}
+  </svg>`;
+}
+
+const statRow = (k, v) => `<div class="fc__stat"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+
+function daysStats(c) {
+  const g = c.goal;
+
+  return `<dl class="fc__stats">
+    ${statRow('Marked', `${num1(c.marked)} / ${c.possible_total}`)}
+    ${statRow('Pace', `${Math.round(c.pace.rate * 100)}%`)}
+    ${c.finished ? '' : statRow('Blue projects', `≈${num1(c.final)} days`)}
+    ${c.finished ? '' : statRow(`To reach ${g.target_pct}%`, g.need_more > 0 ? `${g.need_more} of next ${c.remaining}` : 'On target')}
+  </dl>`;
+}
+
+function exerciseStats(c, e) {
+  const f = e.fit;
+  const goal = e.reached
+    ? 'Reached'
+    : e.eta_day
+      ? `~day ${e.eta_day}`
+      : e.target != null ? 'Not on this trend' : null;
+
+  return `<dl class="fc__stats">
+    ${statRow('Latest', `${num1(e.latest)} ${e.unit}`)}
+    ${statRow('Trend', f ? `${f.slope_week >= 0 ? '+' : ''}${num1(f.slope_week)} ${e.unit}/wk` : 'Log 3+ days')}
+    ${statRow(`By day ${c.total_days}`, f ? `≈${num1(f.end[1])} ${e.unit}` : '–')}
+    ${goal ? statRow(`Goal ${num1(e.target)} ${e.unit}`, goal) : ''}
+  </dl>`;
+}
+
+function dayStrip(c) {
+  if (c.total_days > 60) return '';
+
+  return `<div class="fc__strip" style="--n:${c.total_days}" aria-hidden="true">${c.days.map((d) =>
+    `<i class="fc__cell fc__cell--${d.s}" title="Day ${d.d}${d.s === 'done' ? ' · marked' : d.s === 'off' ? ' · off day' : ''}"></i>`
+  ).join('')}</div>`;
+}
+
+const FC_LEGEND = `<ul class="fc__legend">
+  <li><i class="fc__sw fc__sw--done"></i>Marked</li>
+  <li><i class="fc__sw fc__sw--missed"></i>Missed</li>
+  <li><i class="fc__sw fc__sw--off"></i>Off day</li>
+  <li><i class="fc__sw fc__sw--proj"></i>Blue's projection</li>
+</ul>`;
+
+// The graph + Blue's sentence for one plan. p._fc: undefined = loading, null = failed.
+function forecastHtml(p) {
+  const d = p._fc;
+
+  if (d === undefined) return '<p class="field__hint">Blue is plotting your path…</p>';
+  if (!d) return '';   // failed: stay quiet, the weekly view below still works
+
+  const c = d.consistency;
+  const items = (d.exercises?.items || []).filter((x) => x.points.length);
+  const tab = p._fcTab || 'days';
+  const ex = tab === 'days' ? null : items.find((x) => x.key === tab);
+  const [label, tone] = FC_STATUS[c.status] || FC_STATUS.early;
+
+  const tabs = items.length
+    ? `<div class="fc__tabs" role="tablist" aria-label="Graph">
+        <button class="fc__tab${ex ? '' : ' is-on'}" type="button" role="tab" data-fc-tab="days">Days marked</button>
+        ${items.map((x) => `<button class="fc__tab${ex?.key === x.key ? ' is-on' : ''}" type="button" role="tab" data-fc-tab="${esc(x.key)}">${esc(x.label)}</button>`).join('')}
+      </div>`
+    : '';
+
+  const body = ex
+    ? `${exerciseChart(c, ex)}${exerciseStats(c, ex)}`
+    : `${daysChart(c)}${dayStrip(c)}${FC_LEGEND}${daysStats(c)}`;
+
+  return `<div class="fc">
+    <div class="fc__head">
+      <p class="ins-chart__title">Your path</p>
+      <span class="fc__pill fc__pill--${tone}">${label}</span>
+    </div>
+    <p class="fc__blue"><span class="fc__dot" aria-hidden="true"></span><span><b>Blue</b> ${esc(d.blue.text)}</span></p>
+    ${tabs}
+    ${body}
+  </div>`;
+}
+
+async function loadForecast(p) {
+  if (p._fcBusy || p.is_abandoned) return;
+  p._fcBusy = true;
+
+  try {
+    p._fc = await api.get(`/plans/${p.user_plan_id}/forecast`);
+  } catch {
+    p._fc = null;
+  }
+
+  p._fcBusy = false;
+  paintInsights(p);
+}
 
 const TABS = [['today', 'Today'], ['insights', 'Insights'], ['blue', 'Blue suggests']];
 
@@ -575,6 +781,7 @@ async function loadTips(p) {
 function ensureLoaded(p) {
   loadCoach(p);
   loadTips(p);
+  if (p._fc === undefined) loadForecast(p);
 }
 
 // Progress changed (check-in / missed day): re-render the card and ask again.
@@ -584,6 +791,8 @@ function refreshAfterProgress(p) {
   replaceCard(p);
   if (p._open) loadTips(p);
   loadAnalytics(p);
+  p._fc = undefined;
+  if (p._open) loadForecast(p);
 }
 
 /* ------------------------------------------------------------ check-ins */
@@ -659,6 +868,14 @@ listEl.addEventListener('click', async (e) => {
   if (!p) return;
 
   const err = card.querySelector('[data-error]');
+
+  // Graph tabs (Days marked / each exercise).
+  const fcBtn = e.target.closest('[data-fc-tab]');
+  if (fcBtn) {
+    p._fcTab = fcBtn.dataset.fcTab;
+    paintInsights(p);
+    return;
+  }
 
   // Tabs inside an opened plan.
   const tab = e.target.closest('[data-tab]');
