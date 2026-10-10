@@ -1242,3 +1242,9 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .spot { --card-h: clamp(260px, 70vh, 340px); }
   .spot-panel { max-height: 94dvh; }
 }
+
+.fc { padding: 1rem 1.1rem; border-radius: var(--radius-md); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
+.fc__svg { max-width: 640px; margin-inline: auto; }
+.blue-dot { display: inline-block; width: 8px; height: 8px; margin-right: .5rem; border-radius: 50%; vertical-align: middle;
+  background: var(--accent-violet); box-shadow: 0 0 10px var(--accent-violet); }
+.tips.is-loading .tips__list li { height: 1.1rem; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.2), rgba(255,255,255,.08)); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }

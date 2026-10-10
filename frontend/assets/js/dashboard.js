@@ -788,11 +788,15 @@ function ensureLoaded(p) {
 function refreshAfterProgress(p) {
   p.tips = undefined;
   p._tipsBusy = false;
+  p._fc = undefined;       // the forecast is stale after a check-in
+  p._fcBusy = false;
   replaceCard(p);
-  if (p._open) loadTips(p);
   loadAnalytics(p);
-  p._fc = undefined;
-  if (p._open) loadForecast(p);
+
+  if (p._open) {
+    loadTips(p);
+    loadForecast(p);
+  }
 }
 
 /* ------------------------------------------------------------ check-ins */

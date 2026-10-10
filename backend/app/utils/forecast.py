@@ -187,7 +187,7 @@ def exercise_forecasts(start, length_days, exercises, points_by_exercise, goal_t
             if item["best"] is not None and item["best"] >= target_val:
                 item["reached"] = True
             elif fit and fit[1] > 0:
-                days_needed = (target_val - fit[3]) / fit[1]
+                days_needed = max(0.0, (target_val - fit[3]) / fit[1])
                 if days_needed <= 365:
                     item["eta_day"] = fit[2] + math.ceil(days_needed) + 1
         items.append(item)
