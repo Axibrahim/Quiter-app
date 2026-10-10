@@ -862,7 +862,7 @@ html.is-locked { overflow: hidden; }
 .ptabs--page { width: 100%; margin-bottom: var(--space-3); }
 .ptabs--page .ptab { flex: 1; text-align: center; }
 
-.ppane, .tab-pane { display: grid; gap: var(--space-2); animation: spot-rise .5s var(--ease-out) both; }
+.ppane, .tab-pane { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); animation: spot-rise .5s var(--ease-out) both; }
 .pane-empty { max-width: none; padding: 1.1rem 1.25rem; border-radius: var(--radius-md); background: rgba(255,255,255,.04);
   border: 1px dashed rgba(255,255,255,.16); font-size: .9rem; color: var(--ink-50); }
 
@@ -919,7 +919,7 @@ html.is-locked { overflow: hidden; }
 .pcard.is-open .pcard__details { grid-template-rows: 1fr; }
 .pcard__details-inner { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s .55s; }
 .pcard.is-open .pcard__details-inner { visibility: visible; transition-delay: 0s; }
-.pcard__body { display: grid; gap: var(--space-2); width: 100%; max-width: 900px; margin-inline: auto;
+.pcard__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); width: 100%; max-width: 900px; margin-inline: auto;
   padding: var(--space-3); border-top: 1px solid var(--line); }
 .pcard.is-open .pcard__cover { padding-bottom: var(--space-2); }
 .pcard__body .error { margin: 0; min-height: 0; }
@@ -1336,4 +1336,15 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .nav__pill { -webkit-backdrop-filter: blur(12px) saturate(130%); backdrop-filter: blur(12px) saturate(130%); }
   .dashboard-insights { -webkit-backdrop-filter: blur(10px) saturate(125%); backdrop-filter: blur(10px) saturate(125%); }
   .spot-card.liquid-glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+
+/* ==== Insights: phone pass 2 — graph text readable, nothing wider than the card ==== */
+@media (max-width: 560px) {
+  .fc__axes text { font-size: 15px; }
+  .fc__goal-t { font-size: 15px; }
+  .fc__end-t { font-size: 16px; }
+  .fc__actual { stroke-width: 3.2; }
+  .fc__proj { stroke-width: 2.8; }
+  .fc__pt--done, .fc__pt--missed, .fc__pt--off, .fc__pt--partial, .fc__pt--none { r: 4.6; }
 }

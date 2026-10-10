@@ -23,7 +23,7 @@
  */
 
 /* VERSION:start */
-const VERSION = 'd4f2b8893b';
+const VERSION = '99a05956f9';
 /* VERSION:end */
 
 /* PRECACHE:start */
