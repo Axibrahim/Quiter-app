@@ -6,7 +6,7 @@
  * (You can also override per page with <script>window.QUITER_API_BASE='...'</script>
  * placed before the module scripts.)
  */
-const PROD_API_BASE = 'https://YOUR-REAL-BACKEND.up.railway.app/api/v1';
+const PROD_API_BASE = '/api/v1';   // same origin: Flask serves both the pages and the API
 
 const isLocal = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
 

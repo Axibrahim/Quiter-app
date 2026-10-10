@@ -8,9 +8,10 @@ throwaway instance per test with an isolated test database. This is what
 makes the test suite safe to run without ever touching real user data.
 """
 import os
+import re
 import logging
 
-from flask import Flask, jsonify
+from flask import Flask, Response, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from app.models.models import db
@@ -100,6 +101,38 @@ def create_app(config_name: str = "production") -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(plans_bp)
     app.register_blueprint(admin_bp)
+
+        # --- Frontend (static HTML/JS served by Flask, same origin as the API) ---
+    frontend_dir = os.path.abspath(os.path.join(app.root_path, "..", "..", "frontend"))
+    inline_script = re.compile(r"<script(?![^>]*\bsrc=)", re.IGNORECASE)
+
+    def serve_html(name):
+        path = os.path.join(frontend_dir, name)
+        with open(path, encoding="utf-8") as fh:
+            html = fh.read()
+        html = inline_script.sub('<script nonce="%s"' % request.csp_nonce, html)
+        resp = Response(html, mimetype="text/html")
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+    @app.route("/", methods=["GET"])
+    def index():
+        return serve_html("index.html")
+
+    @app.route("/<path:path>", methods=["GET"])
+    def frontend(path):
+        if path.startswith("api/"):
+            abort(404)
+        full = os.path.normpath(os.path.join(frontend_dir, path))
+        if not full.startswith(frontend_dir + os.sep) or not os.path.isfile(full):
+            abort(404)
+        if path.endswith(".html"):
+            return serve_html(path)
+        resp = send_from_directory(frontend_dir, path)
+        if path == "sw.js":
+            resp.headers["Cache-Control"] = "no-cache"
+            resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
     
     # --- Global error handlers -------------------------------------------
     # Deliberately generic messages on 500 — a stack trace or DB error string

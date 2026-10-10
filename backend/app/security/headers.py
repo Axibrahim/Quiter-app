@@ -17,6 +17,7 @@ CONTENT_SECURITY_POLICY = {
         "'self'",
         "https://cdnjs.cloudflare.com",       # Three.js, GSAP, ScrollTrigger
         "https://unpkg.com",                  # Lenis
+        "https://cdn.jsdelivr.net",           # Three.js module (home-plans-3d.js)
     ],
     "style-src": [
         "'self'",
@@ -31,8 +32,8 @@ CONTENT_SECURITY_POLICY = {
         "'self'",
         "https://fonts.gstatic.com",
     ],
-    "img-src": ["'self'", "data:", "https://downloads.getlayers.ai"],
-    "media-src": ["'self'", "https://downloads.getlayers.ai"],  # glass-flower.mp4 background
+    "img-src": ["'self'", "data:", "https://downloads.getlayers.ai", "https://*.supabase.co"],
+    "media-src": ["'self'", "https://downloads.getlayers.ai", "https://*.supabase.co"],  # background video + Supabase videos
     "connect-src": ["'self'"],           # fetch()/XHR targets — API only, no exfil to third parties
     "worker-src": ["'self'", "blob:"],   # Three.js may spin workers for decoding
     "object-src": "'none'",              # blocks Flash/legacy plugin vectors entirely
@@ -47,6 +48,7 @@ def init_security_headers(app, force_https=True):
     Talisman(
         app,
         content_security_policy=CONTENT_SECURITY_POLICY,
+        content_security_policy_nonce_in=["script-src"],
         force_https=force_https,
         strict_transport_security=force_https,
         strict_transport_security_max_age=31536000,   # 1 year, per HSTS preload requirements
