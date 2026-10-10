@@ -104,5 +104,6 @@ export function initPWA({ hint = true } = {}) {
   const standalone = isStandalone();
   document.documentElement.classList.toggle('is-standalone', standalone);
   registerServiceWorker();
-  if (hint) setupInstallHint();
+  // Install popup disabled; browsers still offer their own install icon.
+  // if (hint) setupInstallHint();
 }
