@@ -31,7 +31,7 @@ const specs = (t) => [
 ].filter(Boolean);
 
 const photo = (t, cls) => isUrl(t.photo_url)
-  ? `<img class="${cls}" src="${esc(t.photo_url)}" alt="" loading="lazy" decoding="async">`
+  ? `<img class="${cls}" src="${esc(t.photo_url)}" alt="" loading="${cls === 'spot-card__photo' ? 'eager' : 'lazy'}" decoding="async">`
   : `<span class="${cls} spot-card__photo--empty" aria-hidden="true"></span>`;
 
 const cardHtml = (t, i) => `
@@ -67,14 +67,25 @@ const panelHtml = (t) => `
   </div>`;
 
 // ---- carousel ---------------------------------------------------------------
-function nearest() {
-  const mid = track.scrollLeft + track.clientWidth / 2;
-  let best = 0, dist = Infinity;
-  items.forEach((el, i) => {
-    const d = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid);
-    if (d < dist) { dist = d; best = i; }
-  });
-  return best;
+// Card centres are measured once (not on every scroll event) so scrolling never forces layout.
+let centers = [], step = 1, half = 0;
+function measure() {
+  centers = items.map((el) => el.offsetLeft + el.offsetWidth / 2);
+  step = centers.length > 1 ? centers[1] - centers[0] : (items[0]?.offsetWidth || 1);
+  half = track.clientWidth / 2;
+}
+
+// Runs once per frame while scrolling: each card scales/fades continuously with its
+// distance from the centre (CSS reads --dist) instead of snapping between two states.
+function update() {
+  const mid = track.scrollLeft + half;
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < items.length; i++) {
+    const d = Math.abs(centers[i] - mid);
+    items[i].style.setProperty('--dist', Math.min(1, d / step).toFixed(3));
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  markActive(best);
 }
 
 function markActive(i) {
@@ -180,11 +191,11 @@ export async function initHomePlans() {
 
   section.hidden = false;
   document.getElementById('cta-fallback')?.setAttribute('hidden', '');
-  requestAnimationFrame(() => { centerOn(0, true); markActive(nearest()); });
+  requestAnimationFrame(() => { measure(); centerOn(0, true); update(); });
 
   track.addEventListener('scroll', () => {
     if (raf) return;
-    raf = requestAnimationFrame(() => { raf = 0; markActive(nearest()); });
+      raf = requestAnimationFrame(() => { raf = 0; update(); });
   }, { passive: true });
 
   track.addEventListener('click', (e) => {
@@ -200,7 +211,7 @@ export async function initHomePlans() {
     if (e.key === 'ArrowLeft') { e.preventDefault(); centerOn(active - 1); }
     if (e.key === 'ArrowRight') { e.preventDefault(); centerOn(active + 1); }
   });
-  addEventListener('resize', () => centerOn(active, true), { passive: true });
+    addEventListener('resize', () => { measure(); centerOn(active, true); update(); }, { passive: true });
 
   overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.closest('[data-close]')) closePanel(); });
   document.addEventListener('keydown', (e) => {

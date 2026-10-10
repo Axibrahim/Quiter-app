@@ -781,11 +781,10 @@ html.is-locked { overflow: hidden; }
   scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .spot__track::-webkit-scrollbar { display: none; }
 .spot__track::before, .spot__track::after { content: ''; flex: 0 0 max(0px, calc(50% - var(--card-w) / 2 - var(--gap))); }
-.spot__item { flex: 0 0 var(--card-w); scroll-snap-align: center; scroll-snap-stop: always;
-  opacity: .45; transform: scale(.86); filter: saturate(.7);
-  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out), filter .5s var(--ease-out); }
-.spot__item:hover { opacity: .7; }
-.spot__item.is-active { opacity: 1; transform: scale(1); filter: none; }
+.spot__item { flex: 0 0 var(--card-w); scroll-snap-align: center;
+  --dist: 1;   /* 0 = centred, 1 = a full card away; set by home-plans.js while scrolling */
+  opacity: calc(1 - .55 * var(--dist)); transform: scale(calc(1 - .14 * var(--dist)));
+  will-change: transform, opacity; backface-visibility: hidden; }
 
 .spot-card { position: relative; display: block; width: 100%; height: var(--card-h); border-radius: var(--radius-lg); text-align: left; cursor: pointer; color: var(--ink);
   -webkit-backdrop-filter: none; backdrop-filter: none; }   /* the photo covers it; skipping blur keeps scrolling smooth */
@@ -1114,7 +1113,8 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .ptab:not(.is-active):hover { background: rgba(255,255,255,.08); }
 
   /* swiper */
-  .spot__item:not(.is-active):hover { opacity: .8; transform: scale(.9); filter: saturate(.9); }
+  .spot__item:not(.is-active):hover .spot-card { transform: scale(1.05); }
+  .spot-card { transition: transform .4s var(--ease-out), box-shadow .4s var(--ease-out); }
   .spot__item.is-active .spot-card:hover { box-shadow: inset 0 1px 1px rgba(255,255,255,.2), 0 28px 70px rgba(0,0,0,.55), 0 0 60px rgba(141,124,255,.22); }
   .spot-card:hover .spot-card__photo { transform: scale(1.06); }
   .spot-card:hover .spot-card__hint { letter-spacing: .2em; }
@@ -1133,7 +1133,6 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .choice:hover, .plan:hover:not(.is-done), .pcard:not(.is-open):hover, .js .tpl:hover, .insight-plan:hover,
   .week__day:hover .week__bar, .btn--exit:hover { transform: none; }
   .choice:hover { background: rgba(12, 12, 20, .42); }
-  .spot__item:not(.is-active):hover { opacity: .45; }
   .card:active, .choice:active, .pcard__cover:active, .tpl:active, .ex-card:active { transform: scale(.985); }
   .spot-card:active { transform: scale(.985); }
   .spot-card { transition: transform .25s var(--ease-out); }
