@@ -57,6 +57,33 @@ function renderNav(user, active, offline = false) {
   panel.addEventListener('click', (e) => { if (e.target.closest('a')) panel.classList.remove('is-open'); });
 }
 
+function renderFooter(user) {
+  const year = new Date().getFullYear();
+  const foot = document.createElement('footer');
+  foot.className = 'site-footer';
+  foot.innerHTML = `
+    <div class="site-footer__panel liquid-glass liquid-glass--panel">
+      <div class="site-footer__brand">
+        <a class="nav__mark" href="${user ? 'dashboard.html' : 'index.html'}">${MARK}<span>Quiter</span></a>
+        <p>Your goal, your plan, and Blue — your AI coach — keeping you on track every day.</p>
+      </div>
+      <nav class="site-footer__col" aria-label="Quiter">
+        <h2 class="site-footer__title">Quiter</h2>
+        <a href="plans.html">Start a plan</a>
+        <a href="index.html#how">How it works</a>
+        <a href="index.html#about">Meet Blue</a>
+      </nav>
+      <nav class="site-footer__col" aria-label="Account">
+        <h2 class="site-footer__title">Account</h2>
+        ${user
+          ? '<a href="dashboard.html">Dashboard</a><a href="profile.html">Profile</a>'
+          : '<a href="index.html?login=1">Log in</a><a href="plans.html">Get started</a>'}
+      </nav>
+    </div>
+    <p class="site-footer__fine">© ${year} Quiter. Blue is an AI coach: its suggestions are guidance, not medical advice.</p>`;
+  document.body.appendChild(foot);
+}
+
 function initReveal() {
   const items = document.querySelectorAll('[data-reveal]');
   if (!('IntersectionObserver' in window)) { items.forEach((el) => el.classList.add('is-visible')); return; }
@@ -89,6 +116,7 @@ export async function initShell({ active = '', auth = 'optional' } = {}) {
   const user = auth === 'none' ? null : await loadUser();
   const offline = !user && auth !== 'none' && sessionCheckWasOffline();
   renderNav(user, active, offline);
+  if (auth !== 'none') renderFooter(user);
   initAuthModal();
 
   // Any element with data-open-auth opens the modal; data-requires-auth links

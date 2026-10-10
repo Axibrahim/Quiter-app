@@ -1248,3 +1248,18 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 .blue-dot { display: inline-block; width: 8px; height: 8px; margin-right: .5rem; border-radius: 50%; vertical-align: middle;
   background: var(--accent-violet); box-shadow: 0 0 10px var(--accent-violet); }
 .tips.is-loading .tips__list li { height: 1.1rem; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.2), rgba(255,255,255,.08)); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+
+/* ---------- 14. SITE FOOTER (injected by shell.js) ---------------------- */
+.site-footer { width: 100%; max-width: var(--max-width); margin: var(--space-5) auto 0; padding: 0 var(--space-3) calc(var(--space-4) + var(--safe-bottom)); }
+.site-footer__panel { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: var(--space-4); padding: var(--space-4); border-radius: var(--radius-lg); }
+.site-footer__brand { display: flex; flex-direction: column; gap: .9rem; align-items: flex-start; }
+.site-footer__brand p { font-size: .95rem; max-width: 34ch; }
+.site-footer__col { display: flex; flex-direction: column; gap: .55rem; font-size: .92rem; color: var(--ink-70); }
+.site-footer__title { font-size: .8rem; font-weight: 500; letter-spacing: .06em; color: var(--ink-40); margin-bottom: .2rem; }
+.site-footer__col a { width: fit-content; transition: color .2s; }
+.site-footer__col a:hover { color: var(--ink); }
+.site-footer__fine { margin: var(--space-2) auto 0; max-width: none; text-align: center; font-size: .8rem; color: var(--ink-40); }
+@media (max-width: 860px) {
+  .site-footer__panel { grid-template-columns: 1fr 1fr; padding: var(--space-3); }
+  .site-footer__brand { grid-column: 1 / -1; }
+}

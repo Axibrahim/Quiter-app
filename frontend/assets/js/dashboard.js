@@ -655,7 +655,7 @@ function render() {
   if (!plans.length) {
     listEl.innerHTML = `<div class="empty liquid-glass liquid-glass--panel">
       <h2 class="h3">No plan yet</h2>
-      <p>Pick athlete or personal coaching and Blue will take it from there.</p>
+      <p>Pick athlete or personal coaching and Blue will build the plan with you and keep you on it.</p>
       <a class="btn btn--solid" href="plans.html">Build my first plan</a>
     </div>`;
     return;
