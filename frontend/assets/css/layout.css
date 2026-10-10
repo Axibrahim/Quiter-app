@@ -491,12 +491,17 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .stack { display: flex; flex-direction: column; gap: var(--space-2); }
 
 /* ---------- 13. RESPONSIVE ---------------------------------------------- */
+/* ---------- 13. RESPONSIVE ---------------------------------------------- */
 @media (max-width: 860px) {
-  .bg-video { overflow: hidden; background-size: max(180vw, 62svh) auto; background-position: 55.7% 4svh; }
-  .bg-video video {
-    position: absolute; left: 50%; top: 4svh; transform: translate3d(-52.5%, 0, 0);
-    width: max(180vw, 62svh); height: auto; max-width: none; aspect-ratio: 800 / 856; object-fit: fill;
-  }
+  .grid-3, .grid-2, .stats { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .nav__links { display: none; }
+  .nav__toggle { display: inline-flex; }
+  .nav__panel { position: fixed; top: 76px; left: 14px; right: 14px; z-index: 49; padding: .6rem; border-radius: var(--radius-lg); flex-direction: column; gap: .2rem; }
+  .nav__panel.is-open { display: flex; }
+  .nav__panel a { padding: .9rem 1rem; border-radius: var(--radius-md); font-size: 1rem; color: var(--ink-70); }
+  .nav__panel a:hover, .nav__panel a.is-active { background: rgba(255,255,255,.08); color: var(--ink); }
+  .hero { align-items: flex-end; padding-bottom: 8vh; }
 }
 @media (max-width: 560px) {
   :root { --space-4: 1.6rem; --space-5: 3rem; }
@@ -592,10 +597,10 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
 /* ---------- Phone background: whole flower above the text (added) ---------- */
 @media (max-width: 860px) {
-  .bg-video { overflow: hidden; background-size: auto 78vh; background-position: 50% 0; }
+  .bg-video { overflow: hidden; background-size: max(180vw, 62svh) auto; background-position: 55.7% 4svh; }
   .bg-video video {
-    position: absolute; left: 50%; top: 0; transform: translate3d(-50%, 0, 0);
-    width: auto; height: 78vh; max-width: none; aspect-ratio: 800 / 855; object-fit: fill;
+    position: absolute; left: 50%; top: 4svh; transform: translate3d(-52.5%, 0, 0);
+    width: max(180vw, 62svh); height: auto; max-width: none; aspect-ratio: 800 / 856; object-fit: fill;
   }
 }
 
