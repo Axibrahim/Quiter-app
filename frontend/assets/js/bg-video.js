@@ -15,6 +15,9 @@
  *   2. Very low rates on a 30fps clip show each source frame for ~100ms = stutter. The clips are
  *      now 60fps (motion-interpolated) and the slowest playing speed is MIN_RATE.
  *   3. play()/pause() flapped near zero speed. Start/stop now use two different thresholds.
+ *   4. Start-up delay: play() used to be called only after the scroll had begun, then the speed ramped
+ *      up slowly from zero. Now the video wakes on the very first touchmove / wheel / scroll event
+ *      and starts already at MIN_RATE.
  *
  * Tune the feel with the constants below.
  */
@@ -78,21 +81,40 @@ export function initBackground() {
 
   const canScroll = () => document.documentElement.scrollHeight > window.innerHeight + 4;
 
+  // Wake the video the instant the user starts moving (before the scroll even registers),
+  // already at a visible speed, so there is no "dead" moment at the start of a swipe.
+  function wake() {
+    lastInputAt = performance.now();
+    if (playing) return;
+    drive = Math.max(drive, MIN_RATE);
+    rate = Math.max(rate, MIN_RATE);
+    setRate(rate);
+    start();
+  }
+
   window.addEventListener('scroll', () => {
     const y = window.scrollY;
-    pendingPx += Math.abs(y - lastY);
+    const d = Math.abs(y - lastY);
+    pendingPx += d;
     lastY = y;
+    if (d > 0) wake();
   }, { passive: true });
 
-  // Pages too short to scroll: wheel + swipe still move the flower.
-  window.addEventListener('wheel', (e) => { if (!canScroll()) pendingPx += Math.abs(e.deltaY); }, { passive: true });
+  window.addEventListener('wheel', (e) => {
+    wake();
+    if (!canScroll()) pendingPx += Math.abs(e.deltaY);   // short pages: wheel still moves the flower
+  }, { passive: true });
   window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
   window.addEventListener('touchmove', (e) => {
     const y = e.touches[0].clientY;
+    wake();                                               // fires before the page scroll event
     if (touchY !== null && !canScroll()) pendingPx += Math.abs(touchY - y);
     touchY = y;
   }, { passive: true });
   window.addEventListener('touchend', () => { touchY = null; }, { passive: true });
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(e.key)) wake();
+  }, { passive: true });
 
   function start() {
     if (playing) return;
@@ -123,14 +145,14 @@ export function initBackground() {
     if (pendingPx > 0) {
       const pxPerSec = (pendingPx / dt) * 1000;
       const target = Math.min(MAX_RATE, Math.max(MIN_RATE, pxPerSec / PX_PER_SECOND_FOR_1X));
-      drive += (target - drive) * 0.2;           // follow the swipe speed (gentle: steadier slow swipes)
+      drive += (target - drive) * (target > drive ? 0.45 : 0.15);   // quick to speed up, gentle to slow down
       lastInputAt = now;
       pendingPx = 0;
     } else if (now - lastInputAt > HOLD_MS) {
       drive *= Math.exp(-dt / FADE_TAU_MS);      // ease out after you stop
     }
 
-    rate += (drive - rate) * (1 - Math.exp(-dt / 70));   // smooth start/stop of the rate itself
+    rate += (drive - rate) * (1 - Math.exp(-dt / (drive > rate ? 25 : 70)));   // fast attack, soft release
 
     if (rate > START_RATE || (playing && rate > STOP_RATE)) {
       start();
