@@ -39,7 +39,7 @@ function renderNav(user, active, offline = false) {
   nav.innerHTML = `
     <div class="nav__pill liquid-glass">
       <div class="nav__left">
-        <a class="nav__mark" href="${user ? 'dashboard.html' : 'index.html'}">${MARK}<span>Quiter</span></a>
+        <a class="nav__mark" href="index.html">${MARK}<span>Quiter</span></a>
         <nav class="nav__links" aria-label="Main">${links}</nav>
       </div>
       <div class="nav__right">${right}
@@ -66,8 +66,7 @@ function renderFooter(user) {
   foot.innerHTML = `
     <div class="site-footer__panel liquid-glass liquid-glass--panel">
       <div class="site-footer__brand">
-        <a class="nav__mark" href="${user ? 'dashboard.html' : 'index.html'}">${MARK}<span>Quiter</span></a>
-        <p>Your goal, your plan, and Blue — your AI coach — keeping you on track every day.</p>
+        <a class="nav__mark" href="index.html">${MARK}<span>Quiter</span></a> — your AI coach — keeping you on track every day.</p>
       </div>
       <nav class="site-footer__col" aria-label="Quiter">
         <h2 class="site-footer__title">Quiter</h2>
