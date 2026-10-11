@@ -8,12 +8,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
+  color-scheme: dark;
+  /* theme plumbing: the light theme (theme-light.css) only overrides these */
+  --tint: 255 255 255;     /* "ink" tint used for fills, borders and hovers   */
+  --shade: 0 0 0;          /* drop-shadow colour                               */
+  --catch: 255 255 255;    /* glass catch-light                                */
+  --shadow-k: 1;           /* drop-shadow strength multiplier                  */
+  --on-ink: #000000;       /* text on top of a solid --ink surface             */
+  --meter-start: #ffffff;
+  --option-bg: #12121a;
+
   --bg: #000000;
   --ink: #ffffff;
-  --ink-70: rgba(255, 255, 255, 0.72);
-  --ink-50: rgba(255, 255, 255, 0.55);
-  --ink-40: rgba(255, 255, 255, 0.42);
-  --line: rgba(255, 255, 255, 0.14);
+  --ink-70: rgb(var(--tint) / 0.72);
+  --ink-50: rgb(var(--tint) / 0.55);
+  --ink-40: rgb(var(--tint) / 0.42);
+  --line: rgb(var(--tint) / 0.14);
 
   --accent-violet: #8d7cff;   /* brand */
   --accent-teal: #3fe8c9;     /* done / on track */
@@ -86,10 +96,10 @@ p { color: var(--ink-70); max-width: 62ch; }
    ::before) + a soft inset catch-light along the top edge.
    ========================================================================= */
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(var(--tint) / 0.04);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
   backdrop-filter: blur(10px) saturate(140%);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 1px rgb(var(--catch) / 0.14);
   position: relative;
   overflow: hidden;
 }
@@ -100,9 +110,9 @@ p { color: var(--ink-70); max-width: 62ch; }
   border-radius: inherit;
   padding: 1.3px;
   background: linear-gradient(180deg,
-    rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.16) 20%,
-    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
-    rgba(255,255,255,0.16) 80%, rgba(255,255,255,0.5) 100%);
+    rgb(var(--tint) / 0.5) 0%, rgb(var(--tint) / 0.16) 20%,
+    rgb(var(--tint) / 0) 40%, rgb(var(--tint) / 0) 60%,
+    rgb(var(--tint) / 0.16) 80%, rgb(var(--tint) / 0.5) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -114,7 +124,7 @@ p { color: var(--ink-70); max-width: 62ch; }
   background: rgba(12, 12, 20, 0.42);
   -webkit-backdrop-filter: blur(22px) saturate(150%);
   backdrop-filter: blur(22px) saturate(150%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.14), 0 18px 50px rgba(0,0,0,0.4);
+  box-shadow: inset 0 1px 1px rgb(var(--catch) / 0.14), 0 18px 50px rgba(0,0,0,0.4);
 }
 
 /* --- Buttons --- */
@@ -127,9 +137,9 @@ p { color: var(--ink-70); max-width: 62ch; }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn--glass { color: var(--ink); }
-.btn--glass:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
-.btn--solid { background: var(--ink); color: #000; font-weight: 600; }
-.btn--solid:hover:not(:disabled) { background: rgba(255,255,255,0.86); }
+.btn--glass:hover:not(:disabled) { background: rgb(var(--tint) / 0.1); }
+.btn--solid { background: var(--ink); color: var(--on-ink); font-weight: 600; }
+.btn--solid:hover:not(:disabled) { background: rgb(var(--tint) / 0.86); }
 .btn--text { color: var(--ink-70); padding: 0.8rem 0.6rem; }
 .btn--text:hover { color: var(--ink); }
 .btn--sm { padding: 0.5rem 1rem; font-size: 0.82rem; }
@@ -139,4 +149,4 @@ p { color: var(--ink-70); max-width: 62ch; }
   display: inline-flex; align-items: center; justify-content: center; color: var(--ink-70);
   transition: color 0.25s var(--ease-out), background 0.25s var(--ease-out);
 }
-.icon-btn:hover { color: var(--ink); background: rgba(255,255,255,0.1); }
+.icon-btn:hover { color: var(--ink); background: rgb(var(--tint) / 0.1); }

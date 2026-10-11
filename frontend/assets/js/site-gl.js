@@ -10,22 +10,30 @@
  * and are tinted between white and the plan accent. Tweak the knobs in the "LOOK" block below.
  */
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js';
-const ACCENTS = [0x8d7cff, 0x3fe8c9, 0xf8bf40, 0xff6b4a];   // violet, teal, gold, ember (tokens.css)
+const ACCENTS = [0x8d7cff, 0x3fe8c9, 0xf8bf40, 0xff6b4a];
+// violet, teal, gold, ember (tokens.css)
+// Light theme: additive white glows vanish on a light page, so stars switch to normal blending with
+// deeper, more saturated colours (same order as ACCENTS) and an indigo base instead of white.
+const ACCENTS_LIGHT = [0x5b46e8, 0x0fa88f, 0xd48a0b, 0xe5502f];
+const BASE_DARK = 0xffffff, BASE_LIGHT = 0x2b2a73;
 
 // ---- LOOK: change these to make the stars bigger / brighter / calmer -------------------------
 const LOOK = {
   countDesktop: 320,     // number of stars (was 190)
-  countPhone: 140,       // (was 90)
+  countPhone: 420,       // phones need a lot more to read on a small screen (was 140)
   minSize: 2.6,          // smallest star, in CSS px (phones get +0.4)
   extraSize: 7.5,        // how much bigger the biggest stars can get (most stay small)
   brightness: 0.95,      // base opacity multiplier (1 = full, can go up to ~1.3 for a stronger glow)
   twinkle: 0.3,          // 0 = steady, 0.5 = strong shimmer
-  whiteness: 0.35,       // lowest accent tint: lower = whiter stars, 1 = every star fully accent-coloured
+  whiteness: 0.35,
+  lightBrightness: 0.80, // star opacity on the light theme (normal blending is stronger than additive)
+  lightWhiteness: 0.55,  // on light, fewer stars stay indigo-grey, more carry the accent colour       // lowest accent tint: lower = whiter stars, 1 = every star fully accent-coloured
 };
 
 let ctl = null;
 let started = false;
 let wantAccent = 0;
+const isLight = () => document.documentElement.dataset.theme === 'light';
 
 // Safe to call before the scene exists (they apply as soon as it does).
 export function setGLAccent(i) { wantAccent = i; ctl?.setAccent(i); }
@@ -52,7 +60,7 @@ const VERT = /* glsl */ `
 `;
 
 const FRAG = /* glsl */ `
-  uniform vec3 uColor;
+  uniform vec3 uBase;
   uniform float uOpacity;
   varying float vTw;
   varying float vTint;
@@ -62,7 +70,7 @@ const FRAG = /* glsl */ `
     float core = smoothstep(0.38, 0.0, d);           // bright pinpoint
     float glow = pow(1.0 - d, 2.4);                  // soft halo
     float a = (core * 0.95 + glow * 0.6) * vTw * uOpacity;
-    vec3 col = mix(vec3(1.0), uColor, vTint);        // white <-> plan accent
+    vec3 col = mix(uBase, uColor, vTint);            // base (white / indigo) <-> plan accent
     gl_FragColor = vec4(col, a);
     #include <colorspace_fragment>
   }
@@ -104,7 +112,7 @@ export async function initSiteGL() {
   const size = new Float32Array(COUNT);   // star size in CSS px
   const phase = new Float32Array(COUNT);  // twinkle offset
   const tint = new Float32Array(COUNT);   // 0 = white, 1 = full accent colour
-  const minSize = LOOK.minSize + (small ? 0.4 : 0);
+  const minSize = LOOK.minSize + (small ? 0.9 : 0);   // phones: bigger base size too
   for (let i = 0; i < COUNT; i++) {
     pos[i * 3] = Math.random() - 0.5;
     pos[i * 3 + 1] = Math.random() - 0.5;
@@ -122,14 +130,16 @@ export async function initSiteGL() {
   geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
   geo.setAttribute('aTint', new THREE.BufferAttribute(tint, 1));
 
-  const accent = new THREE.Color(ACCENTS[Math.abs(wantAccent) % ACCENTS.length]);
+  const palette = () => (isLight() ? ACCENTS_LIGHT : ACCENTS);
+  const accent = new THREE.Color(palette()[Math.abs(wantAccent) % ACCENTS.length]);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uColor: { value: accent.clone() },
+    uColor: { value: accent.clone() },
+    uBase: { value: new THREE.Color(isLight() ? BASE_LIGHT : BASE_DARK) },
       uTime: { value: 0 },
       uPx: { value: renderer.getPixelRatio() },
       uBurst: { value: 0 },
-      uOpacity: { value: LOOK.brightness },
+      uOpacity: { value: isLight() ? LOOK.lightBrightness : LOOK.brightness },
       uTwinkle: { value: LOOK.twinkle },
     },
     vertexShader: VERT,
@@ -137,7 +147,7 @@ export async function initSiteGL() {
     transparent: true,
     depthWrite: false,
     depthTest: false,
-    blending: THREE.AdditiveBlending,
+    blending: isLight() ? THREE.NormalBlending : THREE.AdditiveBlending,
   });
   const U = mat.uniforms;
 
@@ -146,6 +156,7 @@ export async function initSiteGL() {
   scene.add(pts);
 
   let tx = 0, ty = 0, px = 0, py = 0, burst = 0;
+  let baseOpacity = isLight() ? LOOK.lightBrightness : LOOK.brightness;
   let scrollSm = scrollY, lastScroll = scrollY;
   let lastActive = performance.now();
   let running = false, frame = 0, last = 0, first = true;
@@ -195,7 +206,7 @@ export async function initSiteGL() {
     U.uColor.value.lerp(accent, 0.04);
     U.uTime.value = t;
     U.uBurst.value = burst;
-    U.uOpacity.value = Math.min(1.4, LOOK.brightness + burst * 0.35 + flow * 0.25);
+    U.uOpacity.value = Math.min(isLight() ? 1.05 : 1.4, baseOpacity + burst * 0.35 + flow * 0.25);
 
     pts.rotation.y = Math.sin(t * 0.07) * 0.12 + px * 0.2;
     pts.rotation.x = py * 0.12;
@@ -228,8 +239,22 @@ export async function initSiteGL() {
   layout();
   start();
 
+  function applyTheme() {   // live theme switch: no re-init, no flicker
+    const light = isLight();
+    mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+    mat.needsUpdate = true;
+    U.uBase.value.setHex(light ? BASE_LIGHT : BASE_DARK);
+    baseOpacity = light ? LOOK.lightBrightness : LOOK.brightness;
+    accent.setHex(palette()[Math.abs(wantAccent) % ACCENTS.length]);
+    const w = light ? LOOK.lightWhiteness : LOOK.whiteness;
+    for (let i = 0; i < COUNT; i++) tint[i] = w + Math.random() * (1 - w);
+    geo.attributes.aTint.needsUpdate = true;
+  }
+  addEventListener('quiter:theme', applyTheme);
+  if (isLight()) applyTheme();
+
   ctl = {
-    setAccent(i) { accent.setHex(ACCENTS[Math.abs(i) % ACCENTS.length]); },
+    setAccent(i) { accent.setHex(palette()[Math.abs(i) % ACCENTS.length]); },
     pulse() { burst = 1; },
   };
 }

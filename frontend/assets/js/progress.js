@@ -3,7 +3,7 @@ import { initVideoCheckins } from './progress-video.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const STATUS_COLOR = { completed: 'var(--accent-teal)', partial: 'var(--accent-gold)', missed: 'var(--accent-ember)', relapsed: 'var(--accent-ember)', none: 'rgba(255,255,255,.12)' };
+const STATUS_COLOR = { completed: 'var(--accent-teal)', partial: 'var(--accent-gold)', missed: 'var(--accent-ember)', relapsed: 'var(--accent-ember)', none: 'rgb(var(--tint) / .12)' };
 
 function sparkline(points) {
   if (points.length < 2) return '<p class="field__hint">Log a few more days to see a trend.</p>';

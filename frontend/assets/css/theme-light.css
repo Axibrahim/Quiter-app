@@ -1,0 +1,130 @@
+/* =========================================================================
+   QUITER — LIGHT THEME
+   Loaded after layout.css. Everything here is scoped to [data-theme="light"],
+   so dark mode is untouched. Not white: a cool lavender "paper" with a soft
+   violet/teal aurora, white-frost glass and deep-indigo ink.
+   ========================================================================= */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #e9ecf6;                 /* paper */
+  --ink: #15152b;                /* deep indigo, never pure black */
+  --tint: 21 21 43;              /* same hue as --ink, drives every --ink-xx and --line */
+  --shade: 52 44 130;            /* violet-tinted shadows, not grey */
+  --catch: 255 255 255;
+  --shadow-k: .30;
+  --on-ink: #ffffff;
+  --meter-start: #5b46e8;
+  --option-bg: #ffffff;
+
+  /* accents re-tuned for contrast on a light surface (WCAG AA for text) */
+  --accent-violet: #5b46e8;
+  --accent-teal:   #0a8f79;
+  --accent-gold:   #a8680a;
+  --accent-ember:  #d23b1d;
+
+  --ink-70: rgb(var(--tint) / .76);
+  --ink-50: rgb(var(--tint) / .60);
+  --ink-40: rgb(var(--tint) / .48);
+  --line:   rgb(var(--tint) / .13);
+}
+
+/* ---------- Background: paper + aurora, flower video etched in ink ------- */
+[data-theme="light"] body { background: var(--bg); }
+[data-theme="light"] .bg-video { background-image: none !important; }   /* the poster frame is black-on-black: hide it */
+[data-theme="light"] .bg-video video {
+  /* chrome-on-black -> ink-etched chrome on paper (black becomes white, then multiplies into the paper) */
+  filter: invert(1) hue-rotate(180deg) saturate(1.15) contrast(1.05);
+  mix-blend-mode: multiply;
+}
+[data-theme="light"] .bg-video.is-ready video { opacity: .62; }
+[data-theme="light"] .bg-scrim {
+  background:
+    radial-gradient(60% 50% at 78% 12%, rgb(141 124 255 / .30) 0%, transparent 70%),
+    radial-gradient(50% 45% at 8% 78%,  rgb(63 232 201 / .22) 0%, transparent 70%),
+    radial-gradient(110% 85% at 62% 42%, rgb(233 236 246 / 0) 0%, rgb(233 236 246 / .55) 100%);
+}
+[data-theme="light"] .bg-veil {
+  background: linear-gradient(180deg, rgb(255 255 255 / .35) 0%, rgb(255 255 255 / 0) 14%), rgb(238 240 250 / .38);
+}
+@media (max-width: 860px) {
+  [data-theme="light"] body:has(.page) .bg-video { opacity: .35; }
+  [data-theme="light"] body:has(.page) .bg-scrim {
+    background:
+      radial-gradient(70% 40% at 80% 6%, rgb(141 124 255 / .26) 0%, transparent 70%),
+      linear-gradient(180deg, rgb(233 236 246 / .75) 0%, rgb(233 236 246 / .55) 40%, rgb(233 236 246 / .85) 100%);
+  }
+}
+[data-theme="light"] .hero__content::before {
+  background: radial-gradient(90% 80% at 40% 55%, rgb(233 236 246 / .80) 0%, rgb(233 236 246 / .5) 55%, rgb(233 236 246 / 0) 100%);
+}
+
+/* ---------- Liquid glass, light edition: frost + white rim + violet haze -- */
+[data-theme="light"] .liquid-glass {
+  background: rgb(255 255 255 / .50);
+  -webkit-backdrop-filter: blur(16px) saturate(170%); backdrop-filter: blur(16px) saturate(170%);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / .95), 0 8px 28px rgb(var(--shade) / .10);
+}
+[data-theme="light"] .liquid-glass::before {
+  background: linear-gradient(180deg,
+    rgb(255 255 255 / .98) 0%, rgb(255 255 255 / .55) 22%,
+    rgb(120 108 220 / .16) 50%,
+    rgb(255 255 255 / .55) 78%, rgb(255 255 255 / .98) 100%);
+}
+[data-theme="light"] .liquid-glass--panel {
+  background: rgb(255 255 255 / .66);
+  -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / .95), 0 18px 50px rgb(var(--shade) / .16);
+}
+[data-theme="light"] .nav__pill { background: rgb(255 255 255 / .62); }
+[data-theme="light"] .modal-overlay { background: rgb(40 36 100 / .30); }
+[data-theme="light"] .btn--glass:hover:not(:disabled),
+[data-theme="light"] .icon-btn:hover { background: rgb(var(--tint) / .07); }
+[data-theme="light"] .btn--solid:hover:not(:disabled) { background: rgb(var(--tint) / .86); }
+[data-theme="light"] .btn--solid { box-shadow: 0 6px 18px rgb(var(--tint) / .22); }
+
+/* ---------- Components that were tuned for black ------------------------- */
+[data-theme="light"] .stepper input { background: rgb(255 255 255 / .55); }
+[data-theme="light"] .field input:focus,
+[data-theme="light"] .field textarea:focus,
+[data-theme="light"] .field select:focus { background: rgb(255 255 255 / .85); border-color: var(--accent-violet); }
+[data-theme="light"] .btn--exit { color: #8a2410; background: linear-gradient(135deg, rgb(255 107 74 / .22), rgb(255 107 74 / .10)); }
+[data-theme="light"] .showcase__bg::after {
+  background: linear-gradient(180deg, rgb(233 236 246 / .60), rgb(233 236 246 / .35) 45%, rgb(233 236 246 / .75));
+}
+[data-theme="light"] .q-check input:checked + .q-check__box {
+  background: linear-gradient(145deg, #8b7bff 0%, #4d3bd6 100%);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / .6), 0 6px 18px rgb(91 70 232 / .38);
+}
+[data-theme="light"] .result__icon {   /* keep the white disc the glyphs were drawn for, give it an edge on light glass */
+  background: linear-gradient(145deg, #ffffff, #c9cde6);
+  box-shadow: 0 8px 24px rgb(var(--shade) / .22), inset 0 0 0 1px rgb(var(--tint) / .10);
+}
+
+/* Cards that sit on top of a photo keep white text: re-scope the dark tokens to them */
+[data-theme="light"] .spot-card,
+[data-theme="light"] .tpl__photo {
+  --ink: #fff; --tint: 255 255 255; --on-ink: #000;
+  --ink-70: rgb(255 255 255 / .78); --ink-50: rgb(255 255 255 / .6); --ink-40: rgb(255 255 255 / .46);
+  --accent-teal: #3fe8c9; --accent-gold: #f8bf40; --accent-ember: #ff6b4a; --accent-violet: #8d7cff;
+}
+
+/* ---------- Theme toggle (rendered by theme.js into the nav) ------------- */
+.theme-toggle { position: relative; flex: none; }
+.theme-toggle svg { width: 20px; height: 20px; position: absolute; inset: 0; margin: auto; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .5s var(--ease-out), opacity .3s; }
+.theme-toggle .i-sun  { opacity: 0; transform: rotate(-70deg) scale(.5); }
+.theme-toggle .i-moon { opacity: 1; transform: none; }
+[data-theme="light"] .theme-toggle .i-sun  { opacity: 1; transform: none; }
+[data-theme="light"] .theme-toggle .i-moon { opacity: 0; transform: rotate(70deg) scale(.5); }
+
+/* smooth crossfade between themes where the browser supports view transitions */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
+
+/* ---------- Form fields: white-ish, not grey, on frosted glass ---------- */
+[data-theme="light"] .input,
+[data-theme="light"] .field input[type=text], [data-theme="light"] .field input[type=email],
+[data-theme="light"] .field input[type=password], [data-theme="light"] .field input[type=number],
+[data-theme="light"] .field input[type=time], [data-theme="light"] .field textarea, [data-theme="light"] .field select {
+  background: rgb(255 255 255 / .62);
+}

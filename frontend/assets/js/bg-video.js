@@ -34,22 +34,27 @@ const RATE_STEP = 0.05;             // playbackRate is rounded to this and only 
 
 export function initBackground() {
   function initVeil() {
-  if (!document.querySelector('.hero')) return;
-  const root = document.documentElement;
-  let queued = false;
-  const update = () => {
-    queued = false;
-    const vh = window.innerHeight || 1;
-    const t = Math.min(1, Math.max(0, (window.scrollY - vh * 0.45) / (vh * 0.45)));
-    const p = t * t * (3 - 2 * t);
-    root.style.setProperty('--veil', p.toFixed(3));
-    root.style.setProperty('--keep', (1 - p).toFixed(3));
-    root.classList.toggle('has-veil', p > 0.005);
-  };
-  window.addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
-  window.addEventListener('resize', update);
-  update();
-}
+    if (!document.querySelector('.hero')) return;
+    const root = document.documentElement;
+    let queued = false, last = -1;
+    const update = () => {
+      queued = false;
+      const vh = window.innerHeight || 1;
+      // starts a little after you leave the hero and eases in slowly (no sudden jump)
+      const t = Math.min(1, Math.max(0, (window.scrollY - vh * 0.3) / (vh * 0.8)));
+      const p = t * t * (3 - 2 * t);
+      // 32 steps: the browser only re-blurs when the step changes, which keeps phones smooth
+      const q = Math.round(p * 32) / 32;
+      if (q === last) return;
+      last = q;
+      root.style.setProperty('--veil', q.toFixed(3));
+      root.style.setProperty('--keep', (1 - q).toFixed(3));
+      root.classList.toggle('has-veil', q > 0);
+    };
+    window.addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
 
   if (document.querySelector('.bg-video')) return;
 

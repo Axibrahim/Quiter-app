@@ -23,13 +23,14 @@
  */
 
 /* VERSION:start */
-const VERSION = '99a05956f9';
+const VERSION = '74c10f0f62';
 /* VERSION:end */
 
 /* PRECACHE:start */
 const PRECACHE = [
   './',
   'assets/css/layout.css',
+  'assets/css/theme-light.css',
   'assets/css/tokens.css',
   'assets/js/admin.js',
   'assets/js/bg-video.js',
@@ -37,6 +38,7 @@ const PRECACHE = [
   'assets/js/custom-plan-athletics.js',
   'assets/js/custom-plan.js',
   'assets/js/dashboard.js',
+  'assets/js/home-cards.js',
   'assets/js/home-plans.js',
   'assets/js/modules/api-client.js',
   'assets/js/modules/auth-modal.js',
@@ -50,6 +52,8 @@ const PRECACHE = [
   'assets/js/pwa.js',
   'assets/js/reset-password.js',
   'assets/js/site-gl.js',
+  'assets/js/theme-boot.js',
+  'assets/js/theme.js',
   'assets/js/verify.js',
   'assets/media/glass-flower-mobile-poster.jpg',
   'assets/media/glass-flower-poster.jpg',

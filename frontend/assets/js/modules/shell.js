@@ -12,6 +12,7 @@ import { initBackground } from '../bg-video.js';
 import { loadUser, logout, sessionCheckWasOffline } from './auth-state.js';
 import { initPWA } from '../pwa.js';
 import { initAuthModal, openAuthModal } from './auth-modal.js';
+import { initTheme, themeToggleHTML } from '../theme.js';
 
 
 const MARK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 13v9M12 7V2M9 10H4M20 10h-5M9.9 7.9 6.5 4.5M17.5 4.5l-3.4 3.4"/></svg>`;
@@ -42,12 +43,13 @@ function renderNav(user, active, offline = false) {
         <a class="nav__mark" href="index.html">${MARK}<span>Quiter</span></a>
         <nav class="nav__links" aria-label="Main">${links}</nav>
       </div>
-      <div class="nav__right">${right}
+      <div class="nav__right">${themeToggleHTML()}${right}
         ${user ? '' : '<button class="icon-btn nav__toggle" type="button" aria-label="Menu" aria-expanded="false">☰</button>'}
       </div>
     </div>
         ${user ? '' : `<nav class="nav__panel liquid-glass liquid-glass--panel" aria-label="Mobile">${links}</nav>`}`;
   document.body.prepend(nav);
+  initTheme();
 
   const toggle = nav.querySelector('.nav__toggle');
   const panel = nav.querySelector('.nav__panel');
