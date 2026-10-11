@@ -45,7 +45,8 @@
     radial-gradient(110% 85% at 62% 42%, rgb(233 236 246 / 0) 0%, rgb(233 236 246 / .55) 100%);
 }
 [data-theme="light"] .bg-veil {
-  background: linear-gradient(180deg, rgb(255 255 255 / .35) 0%, rgb(255 255 255 / 0) 14%), rgb(238 240 250 / .38);
+  /* fades in together with the blur radius (--veil) instead of popping in at full strength */
+  background: rgb(238 240 250 / calc(var(--veil, 0) * .42));
 }
 @media (max-width: 860px) {
   [data-theme="light"] body:has(.page) .bg-video { opacity: .35; }

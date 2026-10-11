@@ -25,9 +25,9 @@ const LOOK = {
   extraSize: 7.5,        // how much bigger the biggest stars can get (most stay small)
   brightness: 0.95,      // base opacity multiplier (1 = full, can go up to ~1.3 for a stronger glow)
   twinkle: 0.3,          // 0 = steady, 0.5 = strong shimmer
-  whiteness: 0.35,
+  whiteness: 0.35,       // lowest accent tint: lower = whiter stars, 1 = every star fully accent-coloured
   lightBrightness: 0.80, // star opacity on the light theme (normal blending is stronger than additive)
-  lightWhiteness: 0.55,  // on light, fewer stars stay indigo-grey, more carry the accent colour       // lowest accent tint: lower = whiter stars, 1 = every star fully accent-coloured
+  lightWhiteness: 0.55,  // on light, fewer stars stay indigo-grey, more carry the accent colour
 };
 
 let ctl = null;
@@ -61,6 +61,7 @@ const VERT = /* glsl */ `
 
 const FRAG = /* glsl */ `
   uniform vec3 uBase;
+  uniform vec3 uColor;
   uniform float uOpacity;
   varying float vTw;
   varying float vTint;
@@ -134,8 +135,8 @@ export async function initSiteGL() {
   const accent = new THREE.Color(palette()[Math.abs(wantAccent) % ACCENTS.length]);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-    uColor: { value: accent.clone() },
-    uBase: { value: new THREE.Color(isLight() ? BASE_LIGHT : BASE_DARK) },
+      uColor: { value: accent.clone() },
+      uBase: { value: new THREE.Color(isLight() ? BASE_LIGHT : BASE_DARK) },
       uTime: { value: 0 },
       uPx: { value: renderer.getPixelRatio() },
       uBurst: { value: 0 },
