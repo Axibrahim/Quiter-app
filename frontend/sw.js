@@ -23,12 +23,13 @@
  */
 
 /* VERSION:start */
-const VERSION = '76e33e49d9';
+const VERSION = 'b158805025';
 /* VERSION:end */
 
 /* PRECACHE:start */
 const PRECACHE = [
   './',
+  'assets/css/home-stack.css',
   'assets/css/layout.css',
   'assets/css/theme-light.css',
   'assets/css/tokens.css',
@@ -40,6 +41,7 @@ const PRECACHE = [
   'assets/js/dashboard.js',
   'assets/js/home-cards.js',
   'assets/js/home-plans.js',
+  'assets/js/home-stack.js',
   'assets/js/modules/api-client.js',
   'assets/js/modules/auth-modal.js',
   'assets/js/modules/auth-state.js',

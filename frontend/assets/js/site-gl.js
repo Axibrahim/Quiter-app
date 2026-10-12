@@ -20,9 +20,9 @@ const BASE_DARK = 0xffffff, BASE_LIGHT = 0x2b2a73;
 // ---- LOOK: change these to make the stars bigger / brighter / calmer -------------------------
 const LOOK = {
 countDesktop: 650,     // number of stars
-countPhone: 800,       // phones need a lot more to read on a small screen
-  minSize: 2.6,          // smallest star, in CSS px (phones get +0.4)
-  extraSize: 7.5,        // how much bigger the biggest stars can get (most stay small)
+countPhone: 560,       // phones need a lot more to read on a small screen
+  minSize: 3.2,          // smallest star, in CSS px (phones get +1.0)
+  extraSize: 8.5,        // how much bigger the biggest stars can get (most stay small)
   brightness: 0.95,      // base opacity multiplier (1 = full, can go up to ~1.3 for a stronger glow)
   twinkle: 0.3,          // 0 = steady, 0.5 = strong shimmer
   whiteness: 0.35,       // lowest accent tint: lower = whiter stars, 1 = every star fully accent-coloured
@@ -113,7 +113,7 @@ export async function initSiteGL() {
   const size = new Float32Array(COUNT);   // star size in CSS px
   const phase = new Float32Array(COUNT);  // twinkle offset
   const tint = new Float32Array(COUNT);   // 0 = white, 1 = full accent colour
-  const minSize = LOOK.minSize + (small ? 0.9 : 0);   // phones: bigger base size too
+  const minSize = LOOK.minSize + (small ? 1.0 : 0);   // phones: bigger base size too
   for (let i = 0; i < COUNT; i++) {
     pos[i * 3] = Math.random() - 0.5;
     pos[i * 3 + 1] = Math.random() - 0.5;

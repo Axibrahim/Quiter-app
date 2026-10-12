@@ -74,7 +74,10 @@ export function initBackground() {
   wrap.setAttribute('aria-hidden', 'true');
   const small = window.matchMedia('(max-width: 860px)').matches;
   // The still frame that shows until the video is ready (phones use the cropped clip's frame).
-  wrap.style.backgroundImage = `url('assets/media/${small ? 'glass-flower-mobile-poster.jpg' : 'glass-flower-poster.jpg'}')`;
+  const posterUrl = `url('assets/media/${small ? 'glass-flower-mobile-poster.jpg' : 'glass-flower-poster.jpg'}')`;
+  wrap.style.backgroundImage = posterUrl;
+  // url() inside a CSS variable resolves against the STYLESHEET, so give it an absolute address
+  wrap.style.setProperty('--poster', `url('${new URL(`assets/media/${small ? 'glass-flower-mobile-poster.jpg' : 'glass-flower-poster.jpg'}`, document.baseURI).href}')`);   // light theme paints it (inverted) on ::before
 
   const scrim = document.createElement('div');
   scrim.className = 'bg-scrim';
