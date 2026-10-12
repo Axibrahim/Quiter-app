@@ -19,8 +19,8 @@ const BASE_DARK = 0xffffff, BASE_LIGHT = 0x2b2a73;
 
 // ---- LOOK: change these to make the stars bigger / brighter / calmer -------------------------
 const LOOK = {
-  countDesktop: 320,     // number of stars (was 190)
-  countPhone: 420,       // phones need a lot more to read on a small screen (was 140)
+countDesktop: 650,     // number of stars
+countPhone: 800,       // phones need a lot more to read on a small screen
   minSize: 2.6,          // smallest star, in CSS px (phones get +0.4)
   extraSize: 7.5,        // how much bigger the biggest stars can get (most stay small)
   brightness: 0.95,      // base opacity multiplier (1 = full, can go up to ~1.3 for a stronger glow)

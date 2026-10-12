@@ -36,24 +36,33 @@ export function initBackground() {
   function initVeil() {
     if (!document.querySelector('.hero')) return;
     const root = document.documentElement;
-    let queued = false, last = -1;
-    const update = () => {
-      queued = false;
-      const vh = window.innerHeight || 1;
-      // starts a little after you leave the hero and eases in slowly (no sudden jump)
-      const t = Math.min(1, Math.max(0, (window.scrollY - vh * 0.3) / (vh * 0.8)));
-      const p = t * t * (3 - 2 * t);
-      // 32 steps: the browser only re-blurs when the step changes, which keeps phones smooth
-      const q = Math.round(p * 32) / 32;
-      if (q === last) return;
-      last = q;
-      root.style.setProperty('--veil', q.toFixed(3));
-      root.style.setProperty('--keep', (1 - q).toFixed(3));
-      root.classList.toggle('has-veil', q > 0);
+    const STEPS = 48;
+    let target = 0, cur = 0, last = -1, raf = 0;
+
+    const step = () => {
+      raf = 0;
+      cur += (target - cur) * 0.1;                       // glide toward the target
+      if (Math.abs(target - cur) < 0.003) cur = target;
+      const q = Math.round(cur * STEPS) / STEPS;
+      if (q !== last) {
+        last = q;
+        root.style.setProperty('--veil', q.toFixed(3));
+        root.style.setProperty('--keep', (1 - q).toFixed(3));
+        root.classList.toggle('has-veil', q > 0);
+      }
+      if (cur !== target) raf = requestAnimationFrame(step);
     };
-    window.addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
-    window.addEventListener('resize', update);
-    update();
+
+    const measure = () => {
+      const vh = window.innerHeight || 1;
+      const t = Math.min(1, Math.max(0, (window.scrollY - vh * 0.25) / (vh * 1.1)));
+      target = t * t * (3 - 2 * t);
+      if (!raf) raf = requestAnimationFrame(step);
+    };
+
+    window.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    measure();
   }
 
   if (document.querySelector('.bg-video')) return;
