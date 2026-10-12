@@ -18,7 +18,7 @@
 }
 :root[data-theme="light"] {
   --sheet-rgb: 244 246 255;
-  --sheet-a: .38;
+  --sheet-a: .34;
   --frame-hi: rgb(255 255 255 / 1);
   --frame-line: rgb(91 70 232 / .12);
   --frame-mat: rgb(91 70 232 / .10);
@@ -27,8 +27,8 @@
   --frame-shadow: 0 24px 60px rgb(52 44 130 / .20);
 }
 @media (max-width: 860px) {                    /* phones: no blur, so the fill does a bit more */
-  :root { --sheet-a: .52; }
-  :root[data-theme="light"] { --sheet-a: .56; }
+  :root { --sheet-a: .52; --frame-shadow: 0 10px 28px rgb(0 0 0 / .32); }
+  :root[data-theme="light"] { --sheet-a: .52; --frame-shadow: 0 10px 26px rgb(52 44 130 / .16); }
 }
 
 /* ---- the frames ---------------------------------------------------------- */
@@ -77,6 +77,12 @@ main > .hero + .section {
   box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), 0 -24px 70px rgb(0 0 0 / .45), var(--frame-shadow);
 }
 @media (min-width: 861px) { main > .hero + .section { padding-top: 6.5rem; } }
+@media (max-width: 860px) {
+  main > .hero + .section {
+    box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), 0 -10px 30px rgb(0 0 0 / .35), var(--frame-shadow);
+  }
+}
+
 
 /* closing call-to-action: its glass panel is the frame, so no frame around it */
 main > #cta-fallback { background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; overflow: visible; }

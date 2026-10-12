@@ -37,7 +37,13 @@ export function initHomeStack() {
   }
 
   window.addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
-  window.addEventListener('resize', layout);
+  // phones fire "resize" whenever the browser toolbar slides in/out while you scroll; that must not re-layout (it caused jumps)
+  let lastW = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastW && matchMedia('(pointer: coarse)').matches) { update(); return; }
+    lastW = window.innerWidth;
+    layout();
+  });
   new MutationObserver(layout).observe(main, { attributes: true, subtree: true, attributeFilter: ['hidden'] });
   layout();
 }

@@ -92,7 +92,7 @@ function initReveal() {
   if (!('IntersectionObserver' in window)) { items.forEach((el) => el.classList.add('is-visible')); return; }
   const io = new IntersectionObserver((entries) => {
     entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('is-visible'); io.unobserve(en.target); } });
-  }, { threshold: 0.12 });
+  }, { threshold: 0, rootMargin: matchMedia('(max-width: 860px)').matches ? '60% 0px 60% 0px' : '20% 0px 20% 0px' });   // reveal BEFORE it scrolls in, so a fast flick never shows empty space
   items.forEach((el) => io.observe(el));
 }
 

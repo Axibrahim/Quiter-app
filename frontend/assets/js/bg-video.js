@@ -25,14 +25,15 @@ import { initSiteGL } from './site-gl.js';
 
 const PX_PER_SECOND_FOR_1X = 900;   // scroll speed (px/s) that plays the video at normal speed
 const MIN_RATE = 0.6;               // slowest playback while you're moving (60fps clip => >=36 visible fps)
-const MAX_RATE = window.matchMedia('(max-width: 860px)').matches ? 2 : 3;   // phones can't decode 3x of a 60fps clip
+const MAX_RATE = window.matchMedia('(max-width: 860px)').matches ? 1.35 : 3;   // phones: keep decoding well inside what a phone can do
 const VEL_WINDOW_MS = 140;          // swipe speed is averaged over this window (steady even with uneven scroll events)
 const HOLD_MS = 160;                // keep speed this long after the last movement...
 const FADE_TAU_MS = 170;            // ...then ease out
 const START_RATE = 0.3;             // start playing above this smoothed rate
 const STOP_RATE = 0.2;              // pause only when it eases below this (gap = no start/stop flapping)
-const RATE_STEP = 0.04;             // playbackRate is rounded to this
-const WRITE_EVERY_MS = 50;          // playbackRate is written at most this often (every write re-syncs the media clock)
+const PHONE = window.matchMedia('(max-width: 860px)').matches;
+const RATE_STEP = PHONE ? 0.1 : 0.04;        // coarser steps on phones = fewer media-clock re-syncs while swiping
+const WRITE_EVERY_MS = PHONE ? 140 : 50;     // every write re-syncs the media clock
 
 export function initBackground() {
   function initVeil() {
@@ -105,7 +106,21 @@ export function initBackground() {
   video.setAttribute('playsinline', '');
   video.disablePictureInPicture = true;
   video.disableRemotePlayback = true;
-  video.src = small ? 'assets/media/glass-flower-mobile-60.mp4' : 'assets/media/glass-flower-60.mp4';
+  const isLightTheme = () => document.documentElement.dataset.theme === 'light';
+  const videoSrc = () => `assets/media/glass-flower-${small ? 'mobile-' : ''}60${isLightTheme() ? '-light' : ''}.mp4`;
+  video.src = videoSrc();
+  // if a -light clip is missing, fall back to the dark clip + the old CSS filter (class: needs-filter)
+  video.addEventListener('error', () => {
+    if (isLightTheme() && video.src.includes('-light')) { wrap.classList.add('needs-filter'); video.src = videoSrc().replace('-light', ''); }
+  });
+  // live theme switch: swap the clip but keep the same frame, so the flower doesn't jump
+  addEventListener('quiter:theme', () => {
+    const t = video.currentTime;
+    wrap.classList.remove('needs-filter');
+    video.src = videoSrc();
+    appliedRate = 1;
+    video.addEventListener('loadedmetadata', () => { if (video.duration) video.currentTime = t % video.duration; if (playing) video.play().catch(() => {}); }, { once: true });
+  });
   // Once the first frame is decoded, the black page takes over from the poster
   // (otherwise the poster would peek out around the edges when the clip is shifted/scaled).
   video.addEventListener('loadeddata', () => wrap.classList.add('is-ready'));   // CSS then hides the poster

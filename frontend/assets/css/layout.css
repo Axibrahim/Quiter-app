@@ -1447,3 +1447,18 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 @media (hover: none) {
   .js .card--tap[data-reveal].is-visible:active { transform: scale(.985); transition: transform .12s ease-out; }
 }
+
+/* ==== PHONES: app-like scrolling. No live blur over the moving background; solid-ish fills instead ==== */
+@media (max-width: 860px) {
+  html .liquid-glass, html .liquid-glass--panel, html .nav__pill, html .dashboard-insights {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  html .liquid-glass { background: rgb(var(--tint) / .10); }
+  html .liquid-glass--panel { background: rgba(12, 12, 20, .74); }
+  html .nav__pill { background: rgba(10, 10, 16, .78); }
+  html .dashboard-insights { background: rgba(12, 12, 20, .78); }
+  html[data-theme="light"] .liquid-glass { background: rgb(255 255 255 / .72); }
+  html[data-theme="light"] .liquid-glass--panel { background: rgb(255 255 255 / .86); }
+  html[data-theme="light"] .nav__pill { background: rgb(255 255 255 / .86); }
+  html[data-theme="light"] .dashboard-insights { background: rgb(255 255 255 / .84); }
+}
