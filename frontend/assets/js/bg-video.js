@@ -182,15 +182,35 @@ export function initBackground() {
     if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(e.key)) wake();
   }, { passive: true });
 
+  let lastPlayTry = 0;
   function start() {
     if (playing) return;
+    const now = performance.now();
+    if (now - lastPlayTry < 200) return;       // a refused play() must not be retried every frame
+    lastPlayTry = now;
     playing = true;
-    video.play().catch(() => { playing = false; });
+    const p = video.play();
+    if (p && p.catch) p.catch(() => { playing = false; });
   }
   function stop() {
     if (!playing) return;
     playing = false;
     video.pause();
+  }
+
+  // Watchdog: if the browser silently pauses or stalls the video during a hard flick, kick it again.
+  let wdAt = 0, wdTime = -1, wdStuck = 0;
+  function watchdog(now) {
+    if (now - wdAt < 400) return;
+    wdAt = now;
+    if (!playing || document.hidden) { wdStuck = 0; wdTime = -1; return; }
+    if (video.paused) { video.play().catch(() => {}); return; }
+    if (video.currentTime === wdTime) {                        // not advancing = frozen frame
+      wdStuck++;
+      if (wdStuck === 1) video.play().catch(() => {});
+      else { try { video.currentTime = video.currentTime + 0.04; } catch (e) {} }   // nudge past the bad frame
+    } else wdStuck = 0;
+    wdTime = video.currentTime;
   }
 
   function setRate(r, now, force) {
@@ -207,6 +227,7 @@ export function initBackground() {
     const dt = Math.max(1, Math.min(now - lastFrameAt, 100));
     lastFrameAt = now;
     if (document.hidden) { stop(); return; }
+    watchdog(now);
 
     // swipe speed = distance moved over the last VEL_WINDOW_MS (steady, not per-frame noise)
     while (samples.length && now - samples[0].t > VEL_WINDOW_MS) samples.shift();
@@ -221,7 +242,10 @@ export function initBackground() {
 
     // two smoothing stages: speed never changes abruptly, whatever the swipe does
     mid  += (drive - mid)  * (1 - Math.exp(-dt / (drive > mid ? 40 : 110)));
-    rate += (mid   - rate) * (1 - Math.exp(-dt / 50));
+    // the real playback rate can only change this fast (per second): a hard flick ramps up instead of jolting the decoder
+    const dRate = (mid - rate) * (1 - Math.exp(-dt / 50));
+    const lim = (small ? 1.8 : 5) * dt / 1000;
+    rate += Math.max(-lim, Math.min(lim, dRate));
 
     if (rate > START_RATE || (playing && rate > STOP_RATE)) {
       start();

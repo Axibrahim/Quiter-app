@@ -211,7 +211,12 @@ export async function initHomePlans() {
     if (e.key === 'ArrowLeft') { e.preventDefault(); centerOn(active - 1); }
     if (e.key === 'ArrowRight') { e.preventDefault(); centerOn(active + 1); }
   });
-    addEventListener('resize', () => { measure(); centerOn(active, true); update(); }, { passive: true });
+  let lastW = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth === lastW) return;   // phone toolbar sliding in/out: the swiper must not jump back to centre
+    lastW = innerWidth;
+    measure(); centerOn(active, true); update();
+  }, { passive: true });
 
   overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.closest('[data-close]')) closePanel(); });
   document.addEventListener('keydown', (e) => {

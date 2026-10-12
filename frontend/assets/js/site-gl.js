@@ -195,7 +195,7 @@ export async function initSiteGL() {
 
     // Fewer frames on phones and when nothing is happening: keeps scrolling + the video smooth.
     const idle = now - lastActive > 3000;
-    const fps = small ? (idle ? 20 : 30) : (idle ? 30 : 60);
+    const fps = small ? (now < fastUntil || idle ? 20 : 30) : (idle ? 30 : 60);
     if (now - last < 1000 / fps - 2) return;
     last = now;
 
@@ -250,7 +250,13 @@ export async function initSiteGL() {
   addEventListener('pointerdown', (e) => { aim(e.clientX, e.clientY); burst = 1; }, { passive: true });
   addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') { tx = 0; ty = 0; } }, { passive: true });
   addEventListener('touchmove', (e) => { const f = e.touches[0]; if (f) aim(f.clientX, f.clientY); }, { passive: true });
-  addEventListener('scroll', () => { lastActive = performance.now(); }, { passive: true });
+  let prevY = scrollY, fastUntil = 0;
+  addEventListener('scroll', () => {
+    const n = performance.now();
+    lastActive = n;
+    if (Math.abs(scrollY - prevY) > 40) fastUntil = n + 250;   // hard flick: leave the GPU to the video and the page scroll
+    prevY = scrollY;
+  }, { passive: true });
 
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); stop(); });
