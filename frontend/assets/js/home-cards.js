@@ -43,6 +43,8 @@ export function initHomeCards() {
   const overlay = document.getElementById('card-overlay');
   let current = null;
 
+  const isPhone = () => matchMedia('(max-width: 760px)').matches;
+
   function open(card) {
     if (current) return;
     const from = card.getBoundingClientRect();
@@ -53,8 +55,15 @@ export function initHomeCards() {
 
     document.documentElement.classList.add('is-locked');
     overlay.classList.add('is-open');
-    panel.animate([{ clipPath: insetFrom(from, to) }, { clipPath: FULL }], { duration: dur, easing: 'cubic-bezier(.22,1,.36,1)' });
-    panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur * 0.35, easing: 'ease-out' });
+    if (isPhone()) {
+      // phones: slide up like a sheet (transform + opacity only = smooth). The card is usually far from
+      // the sheet at the bottom of the screen, so growing out of the card looked broken.
+      panel.animate([{ transform: 'translate3d(0, 56px, 0) scale(.97)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: reduce ? 0 : 460, easing: 'cubic-bezier(.22,1,.36,1)' });
+    } else {
+      panel.animate([{ clipPath: insetFrom(from, to) }, { clipPath: FULL }], { duration: dur, easing: 'cubic-bezier(.22,1,.36,1)' });
+      panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur * 0.35, easing: 'ease-out' });
+    }
 
     current = card;
     pulseGL();
@@ -71,8 +80,11 @@ export function initHomeCards() {
     document.documentElement.classList.remove('is-locked');
     current = null;
 
-    const anim = panel.animate([{ clipPath: FULL }, { clipPath: insetFrom(from, to) }],
-      { duration: reduce ? 0 : 420, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
+    const anim = isPhone()
+      ? panel.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate3d(0, 48px, 0) scale(.97)', opacity: 0 }],
+          { duration: reduce ? 0 : 300, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' })
+      : panel.animate([{ clipPath: FULL }, { clipPath: insetFrom(from, to) }],
+          { duration: reduce ? 0 : 420, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
     anim.onfinish = () => {
       if (!current) overlay.innerHTML = '';
       card.focus({ preventScroll: true });

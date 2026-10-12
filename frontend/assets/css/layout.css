@@ -1420,3 +1420,38 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .has-veil .site-gl { -webkit-mask-image: none; mask-image: none; }
   .hero__content::before { background: radial-gradient(90% 80% at 40% 55%, rgba(0,0,0,.5) 0%, rgba(0,0,0,.28) 55%, rgba(0,0,0,0) 100%); }
 }
+
+/* ==== Home cards on phones: no per-card blur, lighter reveal, quick press ==== */
+@media (max-width: 860px) {
+  /* the page blur layer already blurs the flower behind the cards; a second blur per card flickers while it fades in */
+  .card--tap.liquid-glass--panel {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: rgba(14, 14, 22, .62);
+  }
+  [data-theme="light"] .card--tap.liquid-glass--panel {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: rgb(255 255 255 / .74);
+  }
+
+  /* shorter, lighter scroll reveal */
+  .js [data-reveal] { transform: translate3d(0, 18px, 0); transition: opacity .55s ease-out, transform .65s var(--ease-out); }
+  .js [data-reveal]:not(.is-visible) { will-change: transform, opacity; }
+  .js .card[data-reveal].is-visible, .js .choice[data-reveal].is-visible { transition: opacity .55s ease-out, transform .65s var(--ease-out); }
+}
+
+/* the open card panel on phones: solid frosted fill (the page behind it is already blurred) */
+@media (max-width: 760px) {
+  .spot-panel--text.liquid-glass--panel {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: rgba(14, 14, 22, .86);
+  }
+  [data-theme="light"] .spot-panel--text.liquid-glass--panel {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: rgb(255 255 255 / .92);
+  }
+}
+
+/* instant press feedback on touch screens */
+@media (hover: none) {
+  .js .card--tap[data-reveal].is-visible:active { transform: scale(.985); transition: transform .12s ease-out; }
+}
