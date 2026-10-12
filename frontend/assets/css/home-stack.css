@@ -6,7 +6,7 @@
    ========================================================================= */
 :root {
   --sheet-rgb: 8 8 13;
-  --sheet-a: .66;                              /* how much of the scene shows through a frame */
+  --sheet-a: .34;                              /* how much of the scene shows through a frame */
   --frame-gap: clamp(10px, 2.4vw, 28px);
   --frame-r: clamp(26px, 5vw, 40px);
   --frame-hi: rgb(255 255 255 / .24);          /* rim light along the top edge */
@@ -18,7 +18,7 @@
 }
 :root[data-theme="light"] {
   --sheet-rgb: 244 246 255;
-  --sheet-a: .62;
+  --sheet-a: .38;
   --frame-hi: rgb(255 255 255 / 1);
   --frame-line: rgb(91 70 232 / .12);
   --frame-mat: rgb(91 70 232 / .10);
@@ -27,8 +27,8 @@
   --frame-shadow: 0 24px 60px rgb(52 44 130 / .20);
 }
 @media (max-width: 860px) {                    /* phones: no blur, so the fill does a bit more */
-  :root { --sheet-a: .76; }
-  :root[data-theme="light"] { --sheet-a: .80; }
+  :root { --sheet-a: .52; }
+  :root[data-theme="light"] { --sheet-a: .56; }
 }
 
 /* ---- the frames ---------------------------------------------------------- */
@@ -61,11 +61,11 @@ main > .section::after {
   letter-spacing: .16em; color: var(--frame-tag);
 }
 
-/* desktop: real frosted glass */
-@media (min-width: 861px) and (hover: hover) {
-  main > .section {
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    backdrop-filter: blur(12px) saturate(140%);
+/* cards inside the frames: one light blur instead of the heavy 22-24px glass (desktop only; phones already have none) */
+@media (min-width: 861px) {
+  main > .section .liquid-glass--panel {
+    -webkit-backdrop-filter: blur(8px) saturate(130%);
+    backdrop-filter: blur(8px) saturate(130%);
   }
 }
 
@@ -92,7 +92,7 @@ main > #cta-fallback::before, main > #cta-fallback::after { display: none; }
 }
 
 /* ---- the hero: pinned base layer that the first frame covers --------------- */
-.has-stack main > .hero.stack__layer { position: sticky; top: 0; z-index: 0; }
+.has-stack main > .hero.stack__layer { position: sticky; top: 0; z-index: 0; will-change: opacity; }
 .has-stack main > .hero.stack__layer { opacity: calc(1 - (var(--cover, 0) - .55) * 2.4); }
 .has-stack main > .hero.stack__layer .hero__content {
   opacity: calc(1 - var(--cover, 0) * 4);

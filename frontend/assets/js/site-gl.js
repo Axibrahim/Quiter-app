@@ -47,15 +47,27 @@ const VERT = /* glsl */ `
   uniform float uPx;
   uniform float uBurst;
   uniform float uTwinkle;
+  uniform float uWave;      // 0..1 progress of the section wave, -1 = idle
+  uniform float uWaveDir;   // +1 = travels up (scrolling down), -1 = travels down
   varying float vTw;
   varying float vTint;
+  varying float vK;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
     float tw = 1.0 - uTwinkle + uTwinkle * (0.5 + 0.5 * sin(uTime * (0.7 + aPhase * 1.8) + aPhase * 40.0));
+    // soft band of light that sweeps across the stars when you cross into a new section
+    float k = 0.0;
+    if (uWave >= 0.0) {
+      float ndcY = gl_Position.y / gl_Position.w;
+      float front = mix(-1.35, 1.35, uWave) * uWaveDir;
+      k = smoothstep(0.55, 0.0, abs(ndcY - front)) * sin(uWave * 3.14159);
+      gl_Position.x += sin(ndcY * 5.0 + uWave * 6.0) * 0.012 * k;   // tiny ripple
+    }
+    vK = k;
     vTw = tw;
     vTint = aTint;
-    gl_PointSize = aSize * uPx * (1.0 + uBurst * 0.7) * (0.85 + 0.3 * tw);
+    gl_PointSize = aSize * uPx * (1.0 + uBurst * 0.7 + k * 1.1) * (0.85 + 0.3 * tw);
   }
 `;
 
@@ -65,12 +77,13 @@ const FRAG = /* glsl */ `
   uniform float uOpacity;
   varying float vTw;
   varying float vTint;
+  varying float vK;
   void main() {
     float d = length(gl_PointCoord - 0.5) * 2.0;     // 0 at the centre, 1 at the sprite edge
     if (d > 1.0) discard;
     float core = smoothstep(0.38, 0.0, d);           // bright pinpoint
     float glow = pow(1.0 - d, 2.4);                  // soft halo
-    float a = (core * 0.95 + glow * 0.6) * vTw * uOpacity;
+    float a = (core * 0.95 + glow * 0.6) * vTw * uOpacity * (1.0 + vK * 1.1);
     vec3 col = mix(uBase, uColor, vTint);            // base (white / indigo) <-> plan accent
     gl_FragColor = vec4(col, a);
     #include <colorspace_fragment>
@@ -121,7 +134,7 @@ export async function initSiteGL() {
     const r = Math.random();
     size[i] = minSize + r * r * r * LOOK.extraSize;          // mostly small, a few big bright ones
     vel[i] = 0.004 + (0.4 * Math.random() + 0.6 * r) * 0.014; // big stars feel closer: drift + scroll a bit faster
-    par[i] = 0.00010 + (0.4 * Math.random() + 0.6 * r) * 0.00032;
+    par[i] = 0.00022 + (0.4 * Math.random() + 0.6 * r) * 0.00062;
     phase[i] = Math.random();
     tint[i] = LOOK.whiteness + Math.random() * (1 - LOOK.whiteness);
   }
@@ -142,6 +155,8 @@ export async function initSiteGL() {
       uBurst: { value: 0 },
       uOpacity: { value: isLight() ? LOOK.lightBrightness : LOOK.brightness },
       uTwinkle: { value: LOOK.twinkle },
+      uWave: { value: -1 },
+      uWaveDir: { value: 1 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -157,6 +172,7 @@ export async function initSiteGL() {
   scene.add(pts);
 
   let tx = 0, ty = 0, px = 0, py = 0, burst = 0;
+  let wave = -1;   // section wave progress, -1 = idle
   let baseOpacity = isLight() ? LOOK.lightBrightness : LOOK.brightness;
   let scrollSm = scrollY, lastScroll = scrollY;
   let lastActive = performance.now();
@@ -185,15 +201,18 @@ export async function initSiteGL() {
 
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
 
-    px += (tx - px) * 0.05;
-    py += (ty - py) * 0.05;
+    const k = 1 - Math.exp(-dt / 0.325);   // same feel as 0.05 at 60fps, identical at any frame rate
+    px += (tx - px) * k;
+    py += (ty - py) * k;
     burst = Math.max(0, burst - dt * 1.6);
+    if (wave >= 0) { wave += dt / 1.3; if (wave >= 1) wave = -1; }
+    U.uWave.value = wave;
 
     // stars fly past as you scroll (near ones faster) and drift upward on their own
-    scrollSm += (scrollY - scrollSm) * 0.12;
+    scrollSm += (scrollY - scrollSm) * (1 - Math.exp(-dt / 0.13));
     const dy = scrollSm - lastScroll;
     lastScroll = scrollSm;
-    const flow = Math.min(1, Math.abs(dy) * 0.02);
+    const flow = Math.min(1, Math.abs(dy) * 0.03);
 
     const a = geo.attributes.position.array;
     for (let i = 0; i < COUNT; i++) {
@@ -207,7 +226,7 @@ export async function initSiteGL() {
     U.uColor.value.lerp(accent, 0.04);
     U.uTime.value = t;
     U.uBurst.value = burst;
-    U.uOpacity.value = Math.min(isLight() ? 1.05 : 1.4, baseOpacity + burst * 0.35 + flow * 0.25);
+    U.uOpacity.value = Math.min(isLight() ? 1.05 : 1.4, baseOpacity + burst * 0.35 + flow * 0.4);
 
     pts.rotation.y = Math.sin(t * 0.07) * 0.12 + px * 0.2;
     pts.rotation.x = py * 0.12;
@@ -252,6 +271,13 @@ export async function initSiteGL() {
     geo.attributes.aTint.needsUpdate = true;
   }
   addEventListener('quiter:theme', applyTheme);
+    // crossing into a new home section: light sweeps through the stars and the accent colour moves on
+  addEventListener('quiter:section', (e) => {
+    const { index = 0, dir = 1 } = e.detail || {};
+    wave = 0; U.uWaveDir.value = dir;
+    lastActive = performance.now();
+    if (index >= 0) { wantAccent = index; accent.setHex(palette()[Math.abs(index) % ACCENTS.length]); }
+  });
   if (isLight()) applyTheme();
 
   ctl = {

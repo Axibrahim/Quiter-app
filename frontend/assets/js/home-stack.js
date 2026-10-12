@@ -29,7 +29,7 @@ export function initHomeStack() {
     queued = false;
     const vh = window.innerHeight || 1;
     let p = next ? Math.min(1, Math.max(0, 1 - next.getBoundingClientRect().top / vh)) : 0;
-    p = Math.round(p * 50) / 50;                       // 50 steps: no needless style writes
+    p = Math.round(p * 200) / 200;                     // 200 steps: smooth fade, still no needless style writes
     if (p === last) return;
     last = p;
     hero.style.setProperty('--cover', p);

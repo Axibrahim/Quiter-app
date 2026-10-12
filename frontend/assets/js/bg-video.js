@@ -48,8 +48,7 @@ export function initBackground() {
       const q = Math.round(cur * STEPS) / STEPS;
       if (q !== last) {
         last = q;
-        root.style.setProperty('--veil', q.toFixed(3));
-        root.style.setProperty('--keep', (1 - q).toFixed(3));
+        veil.style.setProperty('--veil', q.toFixed(3));
         root.classList.toggle('has-veil', q > 0);
       }
       if (cur !== target) raf = requestAnimationFrame(step);

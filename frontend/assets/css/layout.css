@@ -1367,10 +1367,7 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 @media (max-width: 860px) {
   .bg-veil { -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }
 }
-.has-veil .site-gl {
-  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 16%, rgba(0,0,0,var(--keep, 1)) 34%, rgba(0,0,0,var(--keep, 1)) 66%, #000 84%, #000 100%);
-          mask-image: linear-gradient(90deg, #000 0%, #000 16%, rgba(0,0,0,var(--keep, 1)) 34%, rgba(0,0,0,var(--keep, 1)) 66%, #000 84%, #000 100%);
-}
+
 
 /* ==== Home v3: compact tap-cards, animated hero text, smoother blur veil, stars on phones ==== */
 
@@ -1406,16 +1403,11 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 /* -- blur veil: the blur RADIUS grows with scroll (no more faded double-image of the flower) -- */
 .bg-veil {
   display: none; opacity: 1; will-change: auto;
-  background: rgba(8, 8, 14, calc(var(--veil, 0) * .22));
-  -webkit-backdrop-filter: blur(calc(var(--veil, 0) * 16px)) saturate(calc(1 + var(--veil, 0) * .5));
-          backdrop-filter: blur(calc(var(--veil, 0) * 16px)) saturate(calc(1 + var(--veil, 0) * .5));
+  background: rgba(8, 8, 14, calc(var(--veil, 0) * .14));
+  -webkit-backdrop-filter: none; backdrop-filter: none;   /* no live blur over the playing video */
 }
 .has-veil .bg-veil { display: block; }
 @media (max-width: 860px) {
-  .bg-veil {
-    -webkit-backdrop-filter: blur(calc(var(--veil, 0) * 9px)) saturate(calc(1 + var(--veil, 0) * .3));
-            backdrop-filter: blur(calc(var(--veil, 0) * 9px)) saturate(calc(1 + var(--veil, 0) * .3));
-  }
   /* stars stay visible across the whole phone screen (the desktop side-mask hid the middle of it) */
   .has-veil .site-gl { -webkit-mask-image: none; mask-image: none; }
   .hero__content::before { background: radial-gradient(90% 80% at 40% 55%, rgba(0,0,0,.5) 0%, rgba(0,0,0,.28) 55%, rgba(0,0,0,0) 100%); }
