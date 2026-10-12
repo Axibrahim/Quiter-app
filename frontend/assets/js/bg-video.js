@@ -25,12 +25,14 @@ import { initSiteGL } from './site-gl.js';
 
 const PX_PER_SECOND_FOR_1X = 900;   // scroll speed (px/s) that plays the video at normal speed
 const MIN_RATE = 0.6;               // slowest playback while you're moving (60fps clip => >=36 visible fps)
-const MAX_RATE = 3;                 // fastest playback on a hard flick
-const HOLD_MS = 220;                // keep full speed this long after the last movement...
-const FADE_TAU_MS = 170;            // ...then ease out (total tail ≈ 0.5s)
+const MAX_RATE = window.matchMedia('(max-width: 860px)').matches ? 2 : 3;   // phones can't decode 3x of a 60fps clip
+const VEL_WINDOW_MS = 140;          // swipe speed is averaged over this window (steady even with uneven scroll events)
+const HOLD_MS = 160;                // keep speed this long after the last movement...
+const FADE_TAU_MS = 170;            // ...then ease out
 const START_RATE = 0.3;             // start playing above this smoothed rate
 const STOP_RATE = 0.2;              // pause only when it eases below this (gap = no start/stop flapping)
-const RATE_STEP = 0.05;             // playbackRate is rounded to this and only written when it changes by a step
+const RATE_STEP = 0.04;             // playbackRate is rounded to this
+const WRITE_EVERY_MS = 50;          // playbackRate is written at most this often (every write re-syncs the media clock)
 
 export function initBackground() {
   function initVeil() {
@@ -107,16 +109,26 @@ export function initBackground() {
   video.addEventListener('loadeddata', () => wrap.classList.add('is-ready'));   // CSS then hides the poster
   wrap.appendChild(video);
 
-  let pendingPx = 0;       // distance moved since the last frame
+    const samples = [];      // recent movements: { t: time, px: distance }
   let lastY = window.scrollY;
   let touchY = null;
-  let drive = 0;           // target playback rate from input
-  let rate = 0;            // smoothed rate actually applied
+  let drive = 0;           // target playback rate from the measured swipe speed
+  let mid = 0;             // smoothing stage 1
+  let rate = 0;            // smoothing stage 2 = the rate the video really plays at
   let lastInputAt = 0;
   let lastFrameAt = performance.now();
+  let lastWriteAt = 0;
+  let appliedRate = 1;
   let playing = false;
 
   const canScroll = () => document.documentElement.scrollHeight > window.innerHeight + 4;
+
+  function addMove(px) {
+    if (!(px > 0)) return;
+    const now = performance.now();
+    samples.push({ t: now, px });
+    lastInputAt = now;
+  }
 
   // Wake the video the instant the user starts moving (before the scroll even registers),
   // already at a visible speed, so there is no "dead" moment at the start of a swipe.
@@ -124,28 +136,28 @@ export function initBackground() {
     lastInputAt = performance.now();
     if (playing) return;
     drive = Math.max(drive, MIN_RATE);
+    mid = Math.max(mid, MIN_RATE);
     rate = Math.max(rate, MIN_RATE);
-    setRate(rate);
+    setRate(rate, lastInputAt, true);
     start();
   }
 
   window.addEventListener('scroll', () => {
     const y = window.scrollY;
     const d = Math.abs(y - lastY);
-    pendingPx += d;
     lastY = y;
-    if (d > 0) wake();
+    if (d > 0) { addMove(d); wake(); }
   }, { passive: true });
 
   window.addEventListener('wheel', (e) => {
     wake();
-    if (!canScroll()) pendingPx += Math.abs(e.deltaY);   // short pages: wheel still moves the flower
+    if (!canScroll()) addMove(Math.abs(e.deltaY));   // short pages: wheel still moves the flower
   }, { passive: true });
   window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
   window.addEventListener('touchmove', (e) => {
     const y = e.touches[0].clientY;
-    wake();                                               // fires before the page scroll event
-    if (touchY !== null && !canScroll()) pendingPx += Math.abs(touchY - y);
+    wake();                                           // fires before the page scroll event
+    if (touchY !== null && !canScroll()) addMove(Math.abs(touchY - y));
     touchY = y;
   }, { passive: true });
   window.addEventListener('touchend', () => { touchY = null; }, { passive: true });
@@ -164,13 +176,13 @@ export function initBackground() {
     video.pause();
   }
 
-  let appliedRate = 1;
-  function setRate(r) {
+  function setRate(r, now, force) {
     const q = Math.min(MAX_RATE, Math.max(0.0625, Math.round(r / RATE_STEP) * RATE_STEP));
-    if (Math.abs(q - appliedRate) >= RATE_STEP - 1e-6) {   // skip tiny changes: no clock re-sync every frame
-      video.playbackRate = q;
-      appliedRate = q;
-    }
+    if (q === appliedRate) return;
+    if (!force && now - lastWriteAt < WRITE_EVERY_MS) return;   // no clock re-sync every frame
+    video.playbackRate = q;
+    appliedRate = q;
+    lastWriteAt = now;
   }
 
   function frame(now) {
@@ -179,23 +191,26 @@ export function initBackground() {
     lastFrameAt = now;
     if (document.hidden) { stop(); return; }
 
-    if (pendingPx > 0) {
-      const pxPerSec = (pendingPx / dt) * 1000;
-      const target = Math.min(MAX_RATE, Math.max(MIN_RATE, pxPerSec / PX_PER_SECOND_FOR_1X));
-      drive += (target - drive) * (target > drive ? 0.45 : 0.15);   // quick to speed up, gentle to slow down
-      lastInputAt = now;
-      pendingPx = 0;
+    // swipe speed = distance moved over the last VEL_WINDOW_MS (steady, not per-frame noise)
+    while (samples.length && now - samples[0].t > VEL_WINDOW_MS) samples.shift();
+    if (samples.length) {
+      let px = 0;
+      for (let i = 0; i < samples.length; i++) px += samples[i].px;
+      const span = Math.min(VEL_WINDOW_MS, Math.max(60, now - samples[0].t));
+      drive = Math.min(MAX_RATE, Math.max(MIN_RATE, (px / span * 1000) / PX_PER_SECOND_FOR_1X));
     } else if (now - lastInputAt > HOLD_MS) {
-      drive *= Math.exp(-dt / FADE_TAU_MS);      // ease out after you stop
+      drive *= Math.exp(-dt / FADE_TAU_MS);          // ease out after you stop
     }
 
-    rate += (drive - rate) * (1 - Math.exp(-dt / (drive > rate ? 25 : 70)));   // fast attack, soft release
+    // two smoothing stages: speed never changes abruptly, whatever the swipe does
+    mid  += (drive - mid)  * (1 - Math.exp(-dt / (drive > mid ? 40 : 110)));
+    rate += (mid   - rate) * (1 - Math.exp(-dt / 50));
 
     if (rate > START_RATE || (playing && rate > STOP_RATE)) {
       start();
-      setRate(rate);
+      setRate(rate, now);
     } else {
-      drive = 0;
+      drive = 0; mid = 0; rate = 0;
       stop();
     }
   }
