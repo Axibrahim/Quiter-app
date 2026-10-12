@@ -150,3 +150,36 @@
   background: rgb(255 255 255 / .86);
   box-shadow: inset 0 1px 1px rgb(255 255 255 / .95), 0 24px 70px rgb(var(--shade) / .30);
 }
+
+/* ---------- Hovers, light edition ------------------------------------------------
+   The dark hover recipe (near-black fill + heavy black drop shadow) turned every card into a dark
+   smudge on the pale paper. Light hovers lift the card: whiter frost, a soft violet-tinted shadow and a
+   hairline violet rim. Mouse/trackpad only, same as the dark hovers. */
+@media (hover: hover) and (pointer: fine) {
+  [data-theme="light"] .card:hover, [data-theme="light"] .stat:hover, [data-theme="light"] .admin-card:hover,
+  [data-theme="light"] .choice:hover,
+  [data-theme="light"].js .card[data-reveal].is-visible:hover,
+  [data-theme="light"].js .choice[data-reveal].is-visible:hover {
+    background: rgb(255 255 255 / .88);
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / .95), 0 18px 44px rgb(var(--shade) / .22), 0 0 0 1px rgb(91 70 232 / .16);
+  }
+  [data-theme="light"] .plan:hover:not(.is-done),
+  [data-theme="light"].js .tpl:hover,
+  [data-theme="light"] .pcard:not(.is-open):hover {
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / .95), 0 18px 44px rgb(var(--shade) / .22), 0 0 0 1px rgb(91 70 232 / .16);
+  }
+  [data-theme="light"] .spot__item.is-active .spot-card:hover {
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / .6), 0 22px 54px rgb(var(--shade) / .32), 0 0 44px rgb(91 70 232 / .20);
+  }
+  [data-theme="light"] .btn--exit:hover {
+    border-color: rgb(210 59 29 / .6);
+    background: linear-gradient(135deg, rgb(210 59 29 / .14), rgb(255 255 255 / .6));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .9), 0 8px 22px rgb(210 59 29 / .18);
+  }
+  [data-theme="light"] .heatmap__cell:hover { filter: brightness(.94) saturate(1.2); }   /* lighter cells get a touch deeper, not paler */
+  [data-theme="light"] .nav__links a:hover { background: rgb(var(--tint) / .07); }
+}
+/* touch screens keep the sticky :hover after a tap, so keep that light too */
+@media (hover: none) {
+  [data-theme="light"] .choice:hover { background: rgb(255 255 255 / .62); }
+}
