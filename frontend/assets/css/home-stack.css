@@ -1,70 +1,105 @@
 /* =========================================================================
-   QUITER — HOME "STACK" LAYOUT
-   The flower hero is the base layer; every section after it is a rounded "sheet" that slides up and
-   covers the one before it (stacked cards). Needs home-stack.js for the pin offsets + cover dimming;
-   without JS (or with reduced motion) the sheets are simply normal rounded blocks.
+   QUITER — HOME LAYOUT
+   Hero = pinned base layer. The first section slides up over it (the only "stack" moment, JS sets --cover).
+   Every section after that is a floating glass FRAME: inset from the screen edges, soft gaps between them
+   so the flower + stars show through, frosted fill, rim light, inner "mat" line, index number.
    ========================================================================= */
 :root {
-  --sheet-rgb: 8 8 13;          /* sheet colour (dark)  */
-  --sheet-a: .68;               /* how much of the stars/flower shows through */
-  --sheet-rim: rgb(255 255 255 / .16);
-  --sheet-shadow: 0 -22px 60px rgb(0 0 0 / .55);
-  --sheet-handle: rgb(255 255 255 / .28);
+  --sheet-rgb: 8 8 13;
+  --sheet-a: .66;                              /* how much of the scene shows through a frame */
+  --frame-gap: clamp(10px, 2.4vw, 28px);
+  --frame-r: clamp(26px, 5vw, 40px);
+  --frame-hi: rgb(255 255 255 / .24);          /* rim light along the top edge */
+  --frame-line: rgb(255 255 255 / .09);        /* outer hairline */
+  --frame-mat: rgb(255 255 255 / .07);         /* inner "picture mat" line */
+  --frame-sheen: rgb(255 255 255 / .09);       /* corner reflection */
+  --frame-tag: rgb(255 255 255 / .38);
+  --frame-shadow: 0 26px 70px rgb(0 0 0 / .45);
 }
 :root[data-theme="light"] {
-  --sheet-rgb: 241 243 252;
-  --sheet-a: .80;
-  --sheet-rim: rgb(255 255 255 / .95);
-  --sheet-shadow: 0 -18px 50px rgb(52 44 130 / .20);
-  --sheet-handle: rgb(21 21 43 / .22);
+  --sheet-rgb: 244 246 255;
+  --sheet-a: .62;
+  --frame-hi: rgb(255 255 255 / 1);
+  --frame-line: rgb(91 70 232 / .12);
+  --frame-mat: rgb(91 70 232 / .10);
+  --frame-sheen: rgb(255 255 255 / .75);
+  --frame-tag: rgb(21 21 43 / .40);
+  --frame-shadow: 0 24px 60px rgb(52 44 130 / .20);
+}
+@media (max-width: 860px) {                    /* phones: no blur, so the fill does a bit more */
+  :root { --sheet-a: .76; }
+  :root[data-theme="light"] { --sheet-a: .80; }
 }
 
-/* ---- the sheets ---------------------------------------------------------- */
+/* ---- the frames ---------------------------------------------------------- */
+main { counter-reset: frame; }
 main > .section {
   position: relative;
-  min-height: 100svh;                          /* every sheet fully covers the one beneath it */
-  display: flex; flex-direction: column; justify-content: center;   /* short sheets centre their content instead of leaving a void below */
-  padding: 5.25rem 0 var(--space-4);          /* top padding keeps the heading clear of the floating nav when pinned */
-  border-radius: 32px 32px 0 0;
-  background: rgb(var(--sheet-rgb) / var(--sheet-a));
-  box-shadow: inset 0 1px 0 var(--sheet-rim), var(--sheet-shadow);
+  width: min(calc(100% - 2 * var(--frame-gap)), 1280px);
+  margin: 0 auto var(--frame-gap);
+  padding: clamp(4.25rem, 8vw, 6rem) 0 clamp(2.5rem, 6vw, 4.5rem);
+  border-radius: var(--frame-r);
+  overflow: clip;                              /* photo layers + cards stay inside the rounded corners */
+  isolation: isolate;
+  background:
+    radial-gradient(130% 70% at 8% 0%, var(--frame-sheen), transparent 60%),
+    rgb(var(--sheet-rgb) / var(--sheet-a));
+  box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), var(--frame-shadow);
 }
-main > .section::before {                      /* little grab handle: reads as a card you pulled up */
-  content: ''; position: absolute; top: 10px; left: 50%; width: 38px; height: 4px; margin-left: -19px;
-  border-radius: 4px; background: var(--sheet-handle); pointer-events: none;
+main > .section[hidden] { display: none; }
+
+/* the inner "mat" line, like a picture frame */
+main > .section::before {
+  content: ''; position: absolute; inset: 9px; border-radius: calc(var(--frame-r) - 9px);
+  border: 1px solid var(--frame-mat); pointer-events: none;
 }
-@media (min-width: 861px) {
-  main > .section { padding-top: 6.5rem; border-radius: 40px 40px 0 0; }
+/* index number in the corner: 01, 02, 03 ... */
+main > .section::after {
+  counter-increment: frame; content: counter(frame, decimal-leading-zero);
+  position: absolute; top: 20px; right: 26px; pointer-events: none;
+  font: 600 .72rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .16em; color: var(--frame-tag);
 }
 
-/* the last sheet closes with rounded corners and a little air before the footer */
-main > .section.is-last { border-radius: 32px; margin-bottom: 1rem; }
-
-/* the plans showcase keeps its own picture layer inside the sheet */
-main > .showcase { background: rgb(var(--sheet-rgb) / var(--sheet-a)); }
-
-/* ---- stacking (JS adds .has-stack + .stack__layer) ---------------------- */
-.has-stack main > .stack__layer { position: sticky; top: 0; }   /* JS sets the real `top` per layer */
-.has-stack main > .hero.stack__layer { z-index: 0; }
-
-/* the layer underneath is dimmed, then faded out as the next sheet covers it (--cover: 0 → 1).
-   Fading it (instead of leaving it solid) lets the stars + flower behind show through the new top sheet
-   smoothly, with no pop. No scaling: a shrunken card left a visible edge behind the sheet. */
-.has-stack main > .section.stack__layer::after {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 5;
-  background: rgb(var(--sheet-rgb)); opacity: min(.9, calc(var(--cover, 0) * 3.5));   /* dims fast: its text never ghosts through the sheet sliding over it */
+/* desktop: real frosted glass */
+@media (min-width: 861px) and (hover: hover) {
+  main > .section {
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
 }
-.has-stack main > .stack__layer { opacity: calc(1 - (var(--cover, 0) - .55) * 2.4); }
+
+/* first frame = the one that slides over the hero: fills the screen, content centred, lifted shadow */
+main > .hero + .section {
+  min-height: 100svh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding-top: 5.25rem;
+  box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), 0 -24px 70px rgb(0 0 0 / .45), var(--frame-shadow);
+}
+@media (min-width: 861px) { main > .hero + .section { padding-top: 6.5rem; } }
+
+/* closing call-to-action: its glass panel is the frame, so no frame around it */
+main > #cta-fallback { background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; overflow: visible; }
+main > #cta-fallback::before, main > #cta-fallback::after { display: none; }
+
+/* frames ease up as they enter (desktop, browsers with scroll-driven animations) */
+@supports (animation-timeline: view()) {
+  @media (min-width: 861px) and (prefers-reduced-motion: no-preference) {
+    main > .section { animation: frame-in linear both; animation-timeline: view(); animation-range: entry 0% entry 38%; }
+    main > .hero + .section { animation: none; }
+    @keyframes frame-in { from { transform: translateY(40px) scale(.985); } to { transform: none; } }
+  }
+}
+
+/* ---- the hero: pinned base layer that the first frame covers --------------- */
+.has-stack main > .hero.stack__layer { position: sticky; top: 0; z-index: 0; }
+.has-stack main > .hero.stack__layer { opacity: calc(1 - (var(--cover, 0) - .55) * 2.4); }
 .has-stack main > .hero.stack__layer .hero__content {
   opacity: calc(1 - var(--cover, 0) * 4);
   transform: translateY(calc(var(--cover, 0) * -2.2rem));
 }
-
-/* a layer that is completely covered is hidden, so the stars + flower behind show through the top sheet */
-.has-stack main > .stack__layer.is-buried { visibility: hidden; }
+.has-stack main > .hero.stack__layer.is-buried { visibility: hidden; }   /* fully covered: stars + flower show through */
 
 @media (prefers-reduced-motion: reduce) {
-  .has-stack main > .stack__layer { position: relative; }
-  .has-stack main > .section.stack__layer { transform: none; }
-  .has-stack main > .section.stack__layer::after { display: none; }
+  .has-stack main > .hero.stack__layer { position: relative; opacity: 1; }
 }
