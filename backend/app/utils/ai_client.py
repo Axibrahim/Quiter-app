@@ -111,7 +111,7 @@ def can_use_ai() -> bool:
 # ---------------------------------------------------------------------------
 
 def _gemini(system: str, user: str, max_tokens: int, json_mode: bool, t: float) -> str:
-    model = os.environ.get("AI_MODEL") or "gemini-2.5-flash-lite"
+    model = os.environ.get("AI_MODEL") or "gemini-3.1-flash-lite"
     cfg = {"maxOutputTokens": max_tokens, "temperature": 0.8}
     if json_mode:
         cfg["responseMimeType"] = "application/json"
