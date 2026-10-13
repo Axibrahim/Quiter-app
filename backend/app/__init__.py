@@ -92,10 +92,59 @@ def create_app(config_name: str = "production") -> Flask:
     # cookie to travel at all; origins is an explicit allowlist (never "*"
     # when credentials are allowed — browsers reject that combination
     # anyway, and it would be a wide-open CSRF surface if they didn't).
-    allowed_origins = os.environ.get(
-        "CORS_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080"
-    ).split(",")
-    CORS(app, supports_credentials=True, origins=allowed_origins)
+    allowed_origins = [
+        o.strip().rstrip("/")
+        for o in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080").split(",")
+        if o.strip()
+    ]
+    if config_name == "production" and "*" in allowed_origins:
+        raise RuntimeError("CORS_ALLOWED_ORIGINS must list exact origins in production, never '*'.")
+    CORS(
+        app,
+        supports_credentials=True,
+        origins=allowed_origins,
+        methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Quiter-Client"],
+        max_age=600,
+    )
+
+    # Origins that may send state-changing requests with the session cookie: the CORS list,
+    # the public frontend URL used in emails, and this server's own origin.
+    trusted_origins = set(allowed_origins)
+    app_base = os.environ.get("APP_BASE_URL", "").strip().rstrip("/")
+    if app_base:
+        trusted_origins.add(app_base)
+    if config_name == "production" and (not app_base or "localhost" in app_base or "127.0.0.1" in app_base):
+        logging.getLogger("quiter.security").warning(
+            "APP_BASE_URL is not set to your public https URL: email links (verify, reset, check-in) will be broken."
+        )
+
+    JSON_BODY_LIMIT = 1 * 1024 * 1024   # only the two upload routes may be bigger (photos / videos)
+
+    @app.before_request
+    def guard_api_requests():
+        """Extra CSRF + abuse protection on top of SameSite cookies and the X-Quiter-Client header."""
+        if not request.path.startswith("/api/"):
+            return None
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            origin = request.headers.get("Origin")
+            if origin and origin.rstrip("/") not in trusted_origins and origin.rstrip("/") != request.host_url.rstrip("/"):
+                return jsonify({"error": "bad_origin"}), 403
+            is_upload = request.path.endswith("/videos") or request.path.endswith("/upload-photo")
+            if not is_upload and (request.content_length or 0) > JSON_BODY_LIMIT:
+                return jsonify({"error": "payload_too_large"}), 413
+        return None
+
+    @app.after_request
+    def api_cache_headers(resp):
+        # Private API answers must never be stored by browsers, proxies or the CDN.
+        # The two public catalog endpoints can be cached briefly.
+        if request.path.startswith("/api/") and "Cache-Control" not in resp.headers:
+            public = request.method == "GET" and request.path in (
+                "/api/v1/plans/templates", "/api/v1/plans/exercise-catalog", "/api/v1/health",
+            )
+            resp.headers["Cache-Control"] = "public, max-age=60" if public else "no-store"
+        return resp
 
     # --- Blueprints ------------------------------------------------------
     app.register_blueprint(auth_bp)
@@ -126,6 +175,8 @@ def create_app(config_name: str = "production") -> Flask:
         full = os.path.normpath(os.path.join(frontend_dir, path))
         if not full.startswith(frontend_dir + os.sep) or not os.path.isfile(full):
             abort(404)
+        if any(part.startswith(".") for part in path.split("/")) or path.endswith((".py", ".pyc", ".env", ".map")):
+            abort(404)
         if path.endswith(".html"):
             return serve_html(path)
         resp = send_from_directory(frontend_dir, path)
@@ -142,6 +193,23 @@ def create_app(config_name: str = "production") -> Flask:
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "not_found"}), 404
+
+    # Clean JSON instead of Flask's default HTML error pages (which also reveal the framework).
+    @app.errorhandler(400)
+    def bad_request(e):
+        return jsonify({"error": "bad_request"}), 400
+
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        return jsonify({"error": "method_not_allowed"}), 405
+
+    @app.errorhandler(413)
+    def too_large(e):
+        return jsonify({"error": "payload_too_large"}), 413
+
+    @app.errorhandler(415)
+    def unsupported(e):
+        return jsonify({"error": "unsupported_media_type"}), 415
 
     @app.errorhandler(429)
     def rate_limited(e):

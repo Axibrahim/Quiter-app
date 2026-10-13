@@ -69,16 +69,15 @@ main > .section::after {
   }
 }
 
-/* first frame = the one that slides over the hero: fills the screen, content centred, lifted shadow */
+/* first frame = the one that slides over the hero: sized to its content, lifted shadow */
 main > .hero + .section {
-  min-height: 100svh;
-  display: flex; flex-direction: column; justify-content: center;
-  padding-top: 5.25rem;
+  padding-top: clamp(4.25rem, 7vw, 5.5rem);
+  padding-bottom: clamp(2rem, 4vw, 3rem);
   box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), 0 -24px 70px rgb(0 0 0 / .45), var(--frame-shadow);
 }
-@media (min-width: 861px) { main > .hero + .section { padding-top: 6.5rem; } }
 @media (max-width: 860px) {
   main > .hero + .section {
+    padding-top: 4.25rem;
     box-shadow: inset 0 1px 0 var(--frame-hi), inset 0 0 0 1px var(--frame-line), 0 -10px 30px rgb(0 0 0 / .35), var(--frame-shadow);
   }
 }

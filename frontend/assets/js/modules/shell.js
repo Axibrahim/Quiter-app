@@ -17,6 +17,8 @@ import { initTheme, themeToggleHTML } from '../theme.js';
 
 const MARK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 13v9M12 7V2M9 10H4M20 10h-5M9.9 7.9 6.5 4.5M17.5 4.5l-3.4 3.4"/></svg>`;
 
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 function link(href, label, key, active) {
   return `<a href="${href}"${key === active ? ' class="is-active" aria-current="page"' : ''}>${label}</a>`;
 }
@@ -31,7 +33,7 @@ function renderNav(user, active, offline = false) {
     : user
     ? `${user.is_admin ? '<a class="btn btn--text btn--sm" href="admin.html">Admin</a>' : ''}
        <a class="btn btn--solid btn--sm nav__dash" href="dashboard.html">Dashboard</a>
-       <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${(user.display_name || 'Me').split(' ')[0]}</a>`
+       <a class="btn btn--glass btn--sm liquid-glass" href="profile.html">${esc((user.display_name || 'Me').split(' ')[0])}</a>`
     : `<button class="btn btn--text btn--sm" type="button" data-open-auth="login">Log in</button>
        <button class="btn btn--solid btn--sm" type="button" data-open-auth="signup">Get started</button>`;
 

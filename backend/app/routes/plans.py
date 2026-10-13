@@ -43,6 +43,7 @@ from app.security.checkin_tokens import read_checkin_token
 from app.utils.supabase_storage import upload_progress_video, SupabaseStorageError
 from app.security.session_auth import login_required
 from app.security.limiter import limiter, HABIT_LOG_RATE_LIMIT
+from app.utils.http import json_body, as_str
 from app.utils.validation import validate_uuid_param
 
 plans_bp = Blueprint("plans", __name__, url_prefix="/api/v1/plans")
@@ -57,6 +58,7 @@ AUTO_QUIT_DAYS = 15
 VIDEO_FREQUENCIES = {"weekly", "monthly", None}
 COACH_MESSAGE_RATE_LIMIT = "30 per hour"
 GOAL_HINT_RATE_LIMIT = "30 per hour"
+MAX_VIDEOS_PER_PLAN_PER_DAY = 5
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +134,7 @@ def _read_custom_settings(payload):
         return None, "invalid_identity_statement"
 
     support_style = payload.get("support_style") or "gentle"
-    if support_style not in SUPPORT_STYLES:
+    if not isinstance(support_style, str) or support_style not in SUPPORT_STYLES:
         return None, "invalid_support_style"
 
     raw_times = payload.get("reminder_times", [])
@@ -159,7 +161,7 @@ def _read_custom_settings(payload):
 
     # Optional 10-second video check-ins. Off (None) unless the user opts in.
     video_frequency = payload.get("video_checkin_frequency") or None
-    if video_frequency not in VIDEO_FREQUENCIES:
+    if video_frequency is not None and (not isinstance(video_frequency, str) or video_frequency not in VIDEO_FREQUENCIES):
         return None, "invalid_video_frequency"
 
     return (
@@ -209,11 +211,11 @@ def _read_athletic_payload(payload):
             return None, "invalid_phase"
 
     experience = payload.get("experience") or None
-    if experience is not None and experience not in EXPERIENCE_LEVELS:
+    if experience is not None and (not isinstance(experience, str) or experience not in EXPERIENCE_LEVELS):
         return None, "invalid_experience"
 
     diet = payload.get("diet") or None
-    if diet is not None and diet not in DIET_STYLES:
+    if diet is not None and (not isinstance(diet, str) or diet not in DIET_STYLES):
         return None, "invalid_diet"
 
     raw = payload.get("tracked_exercises")
@@ -233,7 +235,7 @@ def _read_athletic_payload(payload):
         else:
             label = item.get("label")
             metric = item.get("metric")
-            if not isinstance(label, str) or metric not in METRICS:
+            if not isinstance(label, str) or not isinstance(metric, str) or metric not in METRICS:
                 return None, "invalid_tracked_exercises"
             label = label.strip()
             if not 2 <= len(label) <= 60:
@@ -305,7 +307,7 @@ def _record_checkin(user_plan, status, note, today):
         plan_day_id=plan_day.id if plan_day else None,
         log_date=today,
         status=status,
-        note=(note or "")[:280] or None,
+        note=as_str(note).strip()[:280] or None,
     ))
 
     if status == LogStatus.COMPLETED.value:
@@ -526,14 +528,14 @@ def goal_placeholder():
     """AI-written example for the 'What do you want to reach?' box, based on the
     answers so far (sport, phase, level, food style, exercises, and the user's
     optional 'about me'). Falls back to a free heuristic. Never fails the form."""
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     sport = payload.get("sport")
     if not sport_exists(sport):
         return jsonify({"error": "invalid_sport"}), 400
 
     phase = find_phase(sport, payload.get("phase")) if payload.get("phase") else None
-    experience = EXPERIENCE_LEVELS.get(payload.get("experience") or "", "")
-    diet = DIET_STYLES.get(payload.get("diet") or "", "")
+    experience = EXPERIENCE_LEVELS.get(as_str(payload.get("experience")), "")
+    diet = DIET_STYLES.get(as_str(payload.get("diet")), "")
 
     labels = []
     raw = payload.get("tracked_exercises")
@@ -559,7 +561,7 @@ def goal_placeholder():
 @login_required
 def off_day_suggestion():
     """Blue's suggested weekly off day, shown while the athlete plan is being set up."""
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     sport = payload.get("sport")
     if not sport_exists(sport):
         return jsonify({"error": "invalid_sport"}), 400
@@ -573,7 +575,7 @@ def off_day_suggestion():
             entry = find_exercise(sport, item.get("key"))
             if entry:
                 exercises.append({"metric": entry["metric"]})
-        elif item.get("metric") in METRICS:
+        elif isinstance(item.get("metric"), str) and item.get("metric") in METRICS:
             exercises.append({"metric": item["metric"]})
 
     weekday, reason = suggest_off_day(sport, payload.get("phase"), exercises)
@@ -593,7 +595,7 @@ def set_off_day(user_plan_id):
     if user_plan.is_completed or user_plan.is_abandoned:
         return jsonify({"error": "plan_not_active"}), 409
 
-    off = (request.get_json(silent=True) or {}).get("off")
+    off = (json_body()).get("off")
     if not isinstance(off, bool):
         return jsonify({"error": "invalid_off"}), 400
 
@@ -644,7 +646,7 @@ def set_off_day(user_plan_id):
 def adopt_plan():
     """Start a catalog plan. Refuses to double-enroll in the same template
     while an active instance already exists."""
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     template_id = payload.get("template_id")
 
     if not validate_uuid_param(template_id):
@@ -729,9 +731,9 @@ def checkin(user_plan_id):
     if err:
         return err
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     status_raw = payload.get("status")
-    if status_raw not in [s.value for s in LogStatus]:
+    if not isinstance(status_raw, str) or status_raw not in [s.value for s in LogStatus]:
         return jsonify({"error": "invalid_status"}), 400
 
     result, error = _record_checkin(user_plan, status_raw, payload.get("note"), _local_today(user_plan))
@@ -770,7 +772,7 @@ def log_exercises(user_plan_id):
     if not tracked:
         return jsonify({"error": "no_tracked_exercises"}), 400
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     entries = payload.get("entries")
     if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_TRACKED_EXERCISES:
         return jsonify({"error": "invalid_entries"}), 400
@@ -995,7 +997,7 @@ def create_custom_plan():
     (defaults to "build") — the app is a personal coach now, not break/build.
     The template title is a short AI-written plan name (free fallback).
     """
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
 
     goal_text = payload.get("goal_text") or ""
     if not isinstance(goal_text, str):
@@ -1005,7 +1007,7 @@ def create_custom_plan():
         return jsonify({"error": "invalid_goal_text"}), 400
 
     direction = payload.get("direction") or "build"
-    if direction not in ("break", "build"):
+    if not isinstance(direction, str) or direction not in ("break", "build"):
         return jsonify({"error": "invalid_direction"}), 400
 
     settings, error = _read_custom_settings(payload)
@@ -1080,7 +1082,7 @@ def create_athletic_plan():
     list live in athletic_metadata (JSONB) rather than bloating UserPlan with
     columns. The template title is a short AI-written plan name (free fallback).
     """
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
 
     athletic_fields, error = _read_athletic_payload(payload)
     if error:
@@ -1113,7 +1115,7 @@ def create_athletic_plan():
     athletic_fields["plan_name"] = plan_name
 
     off_choice = payload.get("off_day") or "none"
-    if off_choice not in ("none", "blue"):
+    if not isinstance(off_choice, str) or off_choice not in ("none", "blue"):
         return jsonify({"error": "invalid_off_day"}), 400
     if off_choice == "blue":
         weekday, reason = suggest_off_day(
@@ -1181,10 +1183,18 @@ def upload_progress_video_route(user_plan_id):
     if file is None:
         return jsonify({"error": "no_file"}), 400
 
+    # Storage-abuse guard: a check-in video is 10 seconds, so a handful per plan per day is plenty.
+    since = datetime.utcnow() - timedelta(days=1)
+    recent = ProgressVideo.query.filter(
+        ProgressVideo.user_plan_id == user_plan.id, ProgressVideo.created_at >= since
+    ).count()
+    if recent >= MAX_VIDEOS_PER_PLAN_PER_DAY:
+        return jsonify({"error": "video_limit_reached"}), 429
+
     try:
         video_url = upload_progress_video(file.read(), file.mimetype)
     except SupabaseStorageError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e).split(":")[0]}), 400
 
     day_number = _current_day_number(user_plan, _local_today(user_plan))
 
@@ -1228,9 +1238,9 @@ def set_video_frequency(user_plan_id):
     if err:
         return err
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     frequency = payload.get("frequency")
-    if frequency not in VIDEO_FREQUENCIES:
+    if frequency is not None and (not isinstance(frequency, str) or frequency not in VIDEO_FREQUENCIES):
         return jsonify({"error": "invalid_frequency"}), 400
 
     user_plan.video_checkin_frequency = frequency
@@ -1323,7 +1333,7 @@ def email_checkin():
     No session needed — the signed token IS the authorization, and it can only
     complete this one plan for this one day.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     parsed = read_checkin_token(payload.get("token"))
     if parsed is None:
         return jsonify({"error": "invalid_or_expired_token"}), 400

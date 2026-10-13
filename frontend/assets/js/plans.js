@@ -13,9 +13,12 @@ let modal = null;
 let common = null;
 let selected = null;
 
+// encodeURI leaves ' ( ) untouched, so they are encoded by hand: a URL can never close the CSS url('...') early.
+const cssUrl = (u) => esc(encodeURI(u).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29'));
+
 function card(t) {
   const hasPhoto = /^https?:\/\//i.test(t.photo_url || '');
-  const photo = hasPhoto ? `<div class="tpl__photo" style="background-image:url('${encodeURI(t.photo_url)}')"></div>` : '';
+  const photo = hasPhoto ? `<div class="tpl__photo" style="background-image:url('${cssUrl(t.photo_url)}')"></div>` : '';
   return `<article class="tpl liquid-glass liquid-glass--panel" data-reveal>
     ${photo}
     <div class="tpl__body">

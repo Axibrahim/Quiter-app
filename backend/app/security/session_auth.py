@@ -14,6 +14,8 @@ check below, since SameSite alone doesn't cover older browsers or
 same-site-subdomain edge cases.
 """
 import functools
+import hashlib
+import hmac
 import time
 from flask import session, request, jsonify, g
 
@@ -23,6 +25,14 @@ from app.models.models import db, User
 # Sessions WITHOUT "Remember me" also stop working on the server after this
 # long, so a browser that restores session cookies can't keep one alive forever.
 SHORT_SESSION_SECONDS = 12 * 60 * 60
+
+
+def session_fingerprint(user: User) -> str:
+    """Changes whenever the password hash or the email changes. It is stored in the
+    signed session cookie, so changing your password (or resetting it after a theft)
+    instantly logs out every OTHER device/session — no database column needed."""
+    raw = f"{user.password_hash}|{user.email}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:24]
 
 
 def login_user(user: User, remember: bool = True) -> None:
@@ -39,6 +49,7 @@ def login_user(user: User, remember: bool = True) -> None:
     session["user_id"] = user.id
     session["remember"] = bool(remember)
     session["iat"] = int(time.time())
+    session["fp"] = session_fingerprint(user)
     session.permanent = bool(remember)
 
 
@@ -75,6 +86,14 @@ def login_required(view):
         if user is None or not user.is_active:
             session.clear()
             return jsonify({"error": "account_unavailable"}), 401
+
+        fp = session.get("fp")
+        if fp is None:
+            # Session created before this check existed: upgrade it silently (nobody is logged out by the update).
+            session["fp"] = session_fingerprint(user)
+        elif not hmac.compare_digest(str(fp), session_fingerprint(user)):
+            session.clear()
+            return jsonify({"error": "authentication_required"}), 401
 
         g.current_user = user   # stash for the route body to use
         return view(*args, **kwargs)

@@ -15,7 +15,8 @@ from flask import Blueprint, request, jsonify
 from app.models.models import db, PlanTemplate, PlanDay, UserPlan, gen_uuid
 from app.security.session_auth import login_required
 from app.security.admin_auth import admin_required
-from app.utils.validation import validate_uuid_param
+from app.utils.http import json_body
+from app.utils.validation import validate_uuid_param, validate_slug
 from app.utils.supabase_storage import upload_plan_photo, SupabaseStorageError
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
@@ -76,8 +77,9 @@ def _read_template_payload(payload, partial=False):
         fields["title"] = title
 
     if "slug" in payload or not partial:
-        slug = (payload.get("slug") or "").strip().lower()
-        if not slug or len(slug) > 80 or not all(c.isalnum() or c == "-" for c in slug):
+        slug = payload.get("slug")
+        slug = slug.strip().lower() if isinstance(slug, str) else ""
+        if not validate_slug(slug):
             return None, "invalid_slug"
         if slug.startswith(USER_SLUG_PREFIXES):
             return None, "reserved_slug"
@@ -91,7 +93,7 @@ def _read_template_payload(payload, partial=False):
 
     if "direction" in payload or not partial:
         direction = payload.get("direction")
-        if direction not in VALID_DIRECTIONS:
+        if not isinstance(direction, str) or direction not in VALID_DIRECTIONS:
             return None, "invalid_direction"
         fields["direction"] = direction
 
@@ -185,7 +187,7 @@ def list_all_templates():
 @login_required
 @admin_required
 def create_template():
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     fields, error = _read_template_payload(payload, partial=False)
     if error:
         return jsonify({"error": error}), 400
@@ -214,7 +216,7 @@ def update_template(template_id):
     if template is None:
         return jsonify({"error": "template_not_found"}), 404
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     fields, error = _read_template_payload(payload, partial=True)
     if error:
         return jsonify({"error": error}), 400
@@ -269,6 +271,6 @@ def upload_photo():
     try:
         url = upload_plan_photo(file.read(), file.mimetype)
     except SupabaseStorageError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e).split(":")[0]}), 400
 
     return jsonify({"photo_url": url}), 200

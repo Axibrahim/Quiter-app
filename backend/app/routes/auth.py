@@ -1,10 +1,13 @@
 """
 Authentication routes — /api/v1/auth/*
 """
+import hashlib
+import re
 import secrets
 from datetime import datetime, timedelta
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, jsonify, g, session
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
 from app.models.models import db, User
@@ -20,12 +23,37 @@ from app.security.email import (
     VERIFICATION_TOKEN_TTL,
     PASSWORD_RESET_TOKEN_TTL,
 )
-from app.utils.validation import validate_email_format, validate_password_strength
+from app.utils.http import json_body
+from app.utils.validation import (
+    validate_email_format, validate_password_strength, validate_display_name,
+)
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
 
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
+PROFILE_RATE_LIMIT = "5 per minute"
+_SHA256_HEX = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _hash_token(token: str) -> str:
+    """Verification / reset tokens are stored as SHA-256 hashes. If the database ever leaks,
+    the attacker gets hashes that cannot be used as links. The raw token only exists in the email."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _user_by_token(column_name: str, token):
+    """Find a user by a raw token. Also matches rows saved in the old plaintext format, so links
+    sent before this update keep working until they expire (<= 48h). Remove the fallback after that."""
+    if not isinstance(token, str) or not 20 <= len(token) <= 128:
+        return None
+    column = getattr(User, column_name)
+    conditions = [column == _hash_token(token)]
+    # A stored hash must NEVER be accepted as a token (that would let someone who can read the
+    # database use the hash as a link). Real tokens are 43 characters; hashes are 64 hex characters.
+    if not _SHA256_HEX.match(token):
+        conditions.append(column == token)
+    return User.query.filter(or_(*conditions)).first()
 
 
 def _public_user(user: User) -> dict:
@@ -43,10 +71,12 @@ def _public_user(user: User) -> dict:
 @auth_bp.route("/register", methods=["POST"])
 @limiter.limit(AUTH_RATE_LIMIT)
 def register():
-    payload = request.get_json(silent=True) or {}
-    email = (payload.get("email") or "").strip().lower()
-    password = payload.get("password") or ""
-    display_name = (payload.get("display_name") or "").strip()
+    payload = json_body()
+    raw_email, password, raw_name = payload.get("email"), payload.get("password"), payload.get("display_name")
+    if not all(isinstance(v, str) for v in (raw_email, password, raw_name)):
+        return jsonify({"error": "invalid_email"}), 400
+    email = raw_email.strip().lower()
+    display_name = " ".join(raw_name.split())
 
     if not validate_email_format(email):
         return jsonify({"error": "invalid_email"}), 400
@@ -57,7 +87,7 @@ def register():
             "detail": "Min 10 chars, include a number and a letter.",
         }), 400
 
-    if not (2 <= len(display_name) <= 40):
+    if not validate_display_name(display_name):
         return jsonify({"error": "invalid_display_name"}), 400
 
     verification_token = secrets.token_urlsafe(32)
@@ -65,7 +95,7 @@ def register():
         email=email,
         password_hash=hash_password(password),
         display_name=display_name,
-        verification_token=verification_token,
+        verification_token=_hash_token(verification_token),
         verification_token_expires_at=(
             datetime.utcnow() + VERIFICATION_TOKEN_TTL
         ),
@@ -91,12 +121,14 @@ def register():
 @auth_bp.route("/login", methods=["POST"])
 @limiter.limit(AUTH_RATE_LIMIT)
 def login():
-    payload = request.get_json(silent=True) or {}
-    email = (payload.get("email") or "").strip().lower()
-    password = payload.get("password") or ""
+    payload = json_body()
+    raw_email, password = payload.get("email"), payload.get("password")
+    generic_failure = (jsonify({"error": "invalid_credentials"}), 401)
+    if not isinstance(raw_email, str) or not isinstance(password, str) or len(password) > 128 or len(raw_email) > 255:
+        return generic_failure
+    email = raw_email.strip().lower()
 
     user = User.query.filter_by(email=email).first()
-    generic_failure = (jsonify({"error": "invalid_credentials"}), 401)
 
     if user is None:
         # Perform a password hash check even when the account does not exist,
@@ -154,14 +186,15 @@ def me():
 
 
 @auth_bp.route("/profile", methods=["PATCH"])
+@limiter.limit(PROFILE_RATE_LIMIT)
 @login_required
 def update_profile():
     """Update the current user's email and/or password.
 
     Changing either requires the current password to be re-confirmed.
     """
-    payload = request.get_json(silent=True) or {}
-    current_password = payload.get("current_password") or ""
+    payload = json_body()
+    current_password = payload.get("current_password")
     requested_email = payload.get("email")
     new_password = payload.get("password")
 
@@ -169,7 +202,7 @@ def update_profile():
         return jsonify({"error": "nothing_to_update"}), 400
 
     user = g.current_user
-    if not verify_password(current_password, user.password_hash):
+    if not isinstance(current_password, str) or len(current_password) > 128 or not verify_password(current_password, user.password_hash):
         return jsonify({"error": "invalid_credentials"}), 401
 
     old_email = user.email
@@ -203,7 +236,7 @@ def update_profile():
         user.email = requested_email
         user.is_verified = False
         verification_token = secrets.token_urlsafe(32)
-        user.verification_token = verification_token
+        user.verification_token = _hash_token(verification_token)
         user.verification_token_expires_at = (
             datetime.utcnow() + VERIFICATION_TOKEN_TTL
         )
@@ -216,6 +249,10 @@ def update_profile():
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "email_already_registered"}), 409
+
+    if email_changed or new_password:
+        # Keep THIS browser logged in, but every other session of this account is now invalid.
+        login_user(user, remember=bool(session.get("remember", True)))
 
     # Send notifications only after the profile changes have committed.
     if email_changed:
@@ -242,10 +279,8 @@ def update_profile():
 @auth_bp.route("/verify/confirm", methods=["POST"])
 @limiter.limit(AUTH_RATE_LIMIT)
 def verify_confirm():
-    payload = request.get_json(silent=True) or {}
-    token = payload.get("token") or ""
-
-    user = User.query.filter_by(verification_token=token).first()
+    payload = json_body()
+    user = _user_by_token("verification_token", payload.get("token"))
     if (
         user is None
         or user.verification_token_expires_at is None
@@ -266,7 +301,7 @@ def verify_confirm():
 @login_required
 def update_about():
     """Save the optional 'about you' text (max 200 chars). No password needed."""
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     about = payload.get("about_me")
     if about is None:
         about = ""
@@ -292,7 +327,7 @@ def verify_resend():
         return jsonify({"ok": True, "already_verified": True}), 200
 
     token = secrets.token_urlsafe(32)
-    user.verification_token = token
+    user.verification_token = _hash_token(token)
     user.verification_token_expires_at = (
         datetime.utcnow() + VERIFICATION_TOKEN_TTL
     )
@@ -305,16 +340,17 @@ def verify_resend():
 @auth_bp.route("/password/forgot", methods=["POST"])
 @limiter.limit(AUTH_RATE_LIMIT)
 def password_forgot():
-    payload = request.get_json(silent=True) or {}
-    email = (payload.get("email") or "").strip().lower()
+    payload = json_body()
+    raw_email = payload.get("email")
+    email = raw_email.strip().lower() if isinstance(raw_email, str) and len(raw_email) <= 255 else ""
 
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(email=email).first() if email else None
 
     # Keep the response identical whether or not the address is registered,
     # so this endpoint cannot be used to enumerate accounts.
     if user is not None:
         token = secrets.token_urlsafe(32)
-        user.reset_token = token
+        user.reset_token = _hash_token(token)
         user.reset_token_expires_at = (
             datetime.utcnow() + PASSWORD_RESET_TOKEN_TTL
         )
@@ -332,9 +368,8 @@ def password_forgot():
 @auth_bp.route("/password/reset", methods=["POST"])
 @limiter.limit(AUTH_RATE_LIMIT)
 def password_reset():
-    payload = request.get_json(silent=True) or {}
-    token = payload.get("token") or ""
-    new_password = payload.get("password") or ""
+    payload = json_body()
+    new_password = payload.get("password")
 
     if not validate_password_strength(new_password):
         return jsonify({
@@ -342,7 +377,7 @@ def password_reset():
             "detail": "Min 10 chars, include a number and a letter.",
         }), 400
 
-    user = User.query.filter_by(reset_token=token).first()
+    user = _user_by_token("reset_token", payload.get("token"))
     if (
         user is None
         or user.reset_token_expires_at is None

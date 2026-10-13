@@ -109,16 +109,16 @@ function tipsHtml(p) {
   if (p.is_completed || p.is_abandoned) return '';
 
   if (!p.tips) {
-    return `<div class="tips is-loading" aria-busy="true">
-      <p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue is reading your progress…</p>
+    return `<div class="tips blue-note is-loading" aria-busy="true">
+      <p class="tips__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue is reading your progress…</p>
       <ul class="tips__list" aria-hidden="true"><li></li><li></li><li></li></ul>
     </div>`;
   }
 
   if (!p.tips.length) return '';
 
-  return `<div class="tips">
-    <p class="tips__label"><span class="blue-dot" aria-hidden="true"></span>Blue suggests</p>
+  return `<div class="tips blue-note">
+    <p class="tips__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue suggests</p>
     <ul class="tips__list">${p.tips.map((t) =>
       `<li class="tip">
         <span class="tip__kind tip__kind--${esc(t.k)}">${esc(TIP_LABEL[t.k] || 'Tip')}</span>
@@ -503,7 +503,10 @@ function forecastHtml(p) {
       <p class="ins-chart__title">Your path</p>
       <span class="fc__pill fc__pill--${tone}">${label}</span>
     </div>
-    <p class="fc__blue"><span class="fc__dot" aria-hidden="true"></span><span><b>Blue</b> ${esc(d.blue.text)}</span></p>
+    <div class="fc__blue blue-note">
+      <p class="blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue says</p>
+      <p class="blue-note__text">${esc(d.blue.text)}</p>
+    </div>
     ${tabs}
     ${body}
   </div>`;
@@ -537,9 +540,9 @@ function todayPane(p) {
   const usual = athlete && p.tracked_exercises?.some(hasDefault);
 
   const coach = p.coach_message || !p._coachFailed
-    ? `<div class="coach ${p.coach_message ? '' : 'is-loading'}" data-coach>
-        <p class="coach__label">Blue</p>
-        <p class="coach__text">${esc(p.coach_message || 'Blue is writing today’s message…')}</p>
+    ? `<div class="coach blue-note ${p.coach_message ? '' : 'is-loading'}" data-coach>
+        <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+        <p class="coach__text blue-note__text">${esc(p.coach_message || 'Blue is writing today’s message…')}</p>
       </div>`
     : '';
 
@@ -554,10 +557,17 @@ function todayPane(p) {
       ? 'I did my usual numbers today'
       : "Yes, I'm on track today";
 
+  const focus = p.micro_goal || p.identity_cue
+    ? `<div class="today-focus">
+        <p class="today-focus__label">Today’s focus</p>
+        ${p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
+        ${p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
+      </div>`
+    : '';
+
   return `
+    ${focus}
     ${coach}
-    ${p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
-    ${p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
     ${exerciseBlock(p)}
     ${offNote(p)}
     <div class="today-actions">

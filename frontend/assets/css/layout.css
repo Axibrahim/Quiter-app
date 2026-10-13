@@ -1462,3 +1462,108 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   html[data-theme="light"] .nav__pill { background: rgb(255 255 255 / .86); }
   html[data-theme="light"] .dashboard-insights { background: rgb(255 255 255 / .84); }
 }
+
+/* ==========================================================================
+   16. DASHBOARD CLEANUP + BLUE TEXT  (added in the security / UX pass)
+   One shared look for everything Blue says: the daily message, the forecast
+   verdict and the suggestions. Full-contrast text, one accent, one structure:
+   [dot + small label]  then  [readable sentence(s)].
+   ========================================================================== */
+
+/* ---- Blue notes ---- */
+.blue-note {
+  display: grid; gap: .5rem; min-width: 0;
+  margin: 0; padding: .95rem 1.1rem;
+  border-radius: var(--radius-md);
+  background: rgb(var(--tint) / .06);
+  border: 1px solid rgb(var(--tint) / .14);
+  box-shadow: inset 3px 0 0 var(--accent-violet);
+}
+.blue-note__tag,
+.coach.blue-note .coach__label,
+.tips.blue-note .tips__label {
+  display: flex; align-items: center; gap: .5rem; margin: 0;
+  font-size: .72rem; font-weight: 600; letter-spacing: .14em; line-height: 1.3;
+  text-transform: uppercase; color: var(--accent-violet);
+}
+.blue-note__text,
+.coach.blue-note .coach__text,
+.fc__blue.blue-note .blue-note__text {
+  margin: 0; max-width: 62ch;
+  font-size: 1rem; line-height: 1.6; color: var(--ink);       /* was --ink-70: too faint on glass */
+  overflow-wrap: anywhere; text-wrap: pretty;
+}
+.blue-note .blue-dot { flex: none; margin: 0; }
+.fc__blue.blue-note { display: grid; align-items: start; }   /* replaces the old flex row */
+.coach.blue-note.is-loading .coach__text { min-height: 1.6em; }
+
+/* ---- Blue's suggestions: one row per tip, label on its own line on phones ---- */
+.tips.blue-note .tips__list { gap: 0; }
+.tips.blue-note .tip {
+  display: grid; grid-template-columns: 5.6rem minmax(0, 1fr); gap: .75rem; align-items: start;
+  padding: .7rem 0; border-top: 1px solid rgb(var(--tint) / .1);
+}
+.tips.blue-note .tip:first-child { border-top: 0; padding-top: .2rem; }
+.tips.blue-note .tip:last-child { padding-bottom: 0; }
+.tips.blue-note .tip__kind { min-width: 0; justify-self: start; width: 100%; }
+.tips.blue-note .tip__text { font-size: .97rem; line-height: 1.55; overflow-wrap: anywhere; }
+.tips.blue-note.is-loading .tips__list li { margin: .35rem 0; }
+
+/* ---- "Today" tab: focus first, then Blue, then numbers, then the check-in ---- */
+.today-focus { display: grid; gap: .4rem; min-width: 0; }
+.today-focus__label {
+  margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-70);
+}
+.today-focus .today__goal { margin: 0; font-size: 1.12rem; line-height: 1.45; font-weight: 500; overflow-wrap: anywhere; }
+.today-focus .today__cue { margin: 0; overflow-wrap: anywhere; }
+.ppane, .tab-pane { gap: var(--space-3); }
+
+/* ---- readability of small secondary text ---- */
+.dash-hint { color: var(--ink-70); }
+.cover-insight__text { color: var(--ink); opacity: .86; }
+.cover-insight__label { font-weight: 600; }
+
+/* ---- nothing may push the page sideways on a phone ---- */
+.page--dash .wrap, .pcard, .pcard__body, .ppane, .tab-pane, .fc, .ins-chart { min-width: 0; max-width: 100%; }
+.fc__svg, .pcard svg { max-width: 100%; height: auto; }
+.ins-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ins-tile__value { overflow-wrap: anywhere; }
+.dash-head .h2, .plan__title, .plan__sub { overflow-wrap: anywhere; }
+.modal--wide { max-height: 90vh; max-height: 90dvh; }
+.page { min-height: 100vh; min-height: 100dvh; }
+
+/* ---- keyboard focus that matches the glass style (the hidden checkbox had none) ---- */
+.btn:focus-visible, .icon-btn:focus-visible, .pcard__toggle:focus-visible, .pcard__cover:focus-visible,
+.ptab:focus-visible, .choice:focus-visible, .spot__dot:focus-visible, .nav a:focus-visible {
+  outline: 2px solid var(--accent-teal); outline-offset: 3px;
+}
+.q-check input:focus-visible + .q-check__box { outline: 2px solid var(--accent-teal); outline-offset: 4px; }
+
+/* ---- phones ---- */
+@media (max-width: 560px) {
+  .blue-note { padding: .85rem .95rem; }
+  .blue-note__text, .coach.blue-note .coach__text, .fc__blue.blue-note .blue-note__text { font-size: .97rem; }
+  .tips.blue-note .tip { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+  .tips.blue-note .tip__kind { width: auto; }
+  .today-focus .today__goal { font-size: 1.05rem; }
+}
+
+/* ---- touch screens: bigger targets, no hover that sticks after a tap ---- */
+@media (pointer: coarse) {
+  .ptab, .pcard__toggle { min-height: 2.75rem; }
+  .q-check { min-height: 2.75rem; }
+}
+@media (hover: none) {
+  .tip:hover .tip__kind { background: rgb(var(--tint) / .1); }
+  .ptab:not(.is-active):hover { background: transparent; color: var(--ink-70); }
+  .q-check:hover input:not(:disabled) + .q-check__box { transform: none; }
+}
+
+/* ---- motion: respect "reduce motion" for the looping effects too ---- */
+@media (prefers-reduced-motion: reduce) {
+  .meter > i::after,
+  .coach.is-loading .coach__text,
+  .tips.is-loading .tips__list li,
+  .cover-insight.is-loading .cover-insight__text { animation: none !important; }
+  .ppane, .tab-pane { animation: none; }
+}
