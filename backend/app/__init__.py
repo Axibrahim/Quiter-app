@@ -23,6 +23,7 @@ from app.routes.admin import admin_bp
 
 def create_app(config_name: str = "production") -> Flask:
     app = Flask(__name__)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     if config_name == "production":
         from werkzeug.middleware.proxy_fix import ProxyFix
