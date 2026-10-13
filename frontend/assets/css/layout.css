@@ -1567,3 +1567,137 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .cover-insight.is-loading .cover-insight__text { animation: none !important; }
   .ppane, .tab-pane { animation: none; }
 }
+
+/* ==========================================================================
+   Blue's coaching flow (dashboard "Today" + "Blue suggests")
+   Stage + message -> 3-step plan -> coming up -> Blue's tip.
+   Uses the shared tokens only, so light mode follows automatically.
+   ========================================================================== */
+
+.blueplan { display: grid; gap: var(--space-3); min-width: 0; }
+
+/* ---- Blue header + journey ---- */
+.bp-top { display: grid; gap: .75rem; min-width: 0; }
+.bp-head { display: flex; align-items: center; gap: .75rem; }
+.bp-head .blue-dot { width: 12px; height: 12px; margin: 0; flex: none; }
+.bp-head__copy { display: grid; gap: .1rem; min-width: 0; }
+.bp-head__tag { margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-violet); }
+.bp-head__stage { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.bp-blurb { margin: 0; max-width: none; font-size: .93rem; line-height: 1.5; color: var(--ink-70); }
+
+.journey { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.journey__seg { display: grid; gap: .35rem; min-width: 0; }
+.journey__bar { height: 4px; border-radius: var(--radius-full); background: rgb(var(--tint) / .14); }
+.journey__name { font-size: .66rem; letter-spacing: .04em; color: var(--ink-50); line-height: 1.25; overflow-wrap: anywhere; }
+.journey__seg.is-past .journey__bar { background: var(--accent-teal); opacity: .75; }
+.journey__seg.is-now .journey__bar { background: var(--accent-violet); }
+.journey__seg.is-now .journey__name { color: var(--ink); font-weight: 600; }
+
+/* ---- Blue's message as a bubble ---- */
+.coach--bubble { gap: .55rem; animation: spot-rise .5s var(--ease-out) both; }
+.coach--bubble .coach__text { font-size: 1.05rem; line-height: 1.6; }
+.coach--bubble.is-failed .coach__text { color: var(--ink-70); }
+.coach--bubble.is-failed .btn { padding-left: 0; }
+
+/* ---- the 3-step plan ---- */
+.steps { display: grid; gap: .75rem; min-width: 0; }
+.steps__head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.steps__title { margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-70); }
+.steps__count { margin: 0; font-size: .82rem; color: var(--ink-70); font-variant-numeric: tabular-nums; }
+.steps__meter { height: 4px; border-radius: var(--radius-full); background: rgb(var(--tint) / .12); overflow: hidden; }
+.steps__meter > i { display: block; height: 100%; border-radius: inherit; background: var(--accent-teal); transition: width .35s var(--ease-out); }
+.steps--rest { padding: var(--space-2); border-radius: var(--radius-md); border: 1px solid rgb(var(--tint) / .12); background: rgb(var(--tint) / .05); }
+
+.steps__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; counter-reset: none; }
+.step {
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); gap: .8rem; align-items: start; min-width: 0;
+  padding: .9rem 1rem; border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--tint) / .12); background: rgb(var(--tint) / .05);
+  transition: background .25s, border-color .25s;
+}
+.step.is-done { border-color: rgb(var(--tint) / .08); background: rgb(var(--tint) / .03); }
+.step.is-done .step__title { color: var(--ink-70); }
+.step__body { display: grid; gap: .35rem; min-width: 0; }
+.step__title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.step__text { margin: 0; max-width: none; font-size: .95rem; line-height: 1.55; color: var(--ink-70); overflow-wrap: anywhere; }
+.step__sub { margin: 0; max-width: none; font-size: .88rem; line-height: 1.5; color: var(--ink-50); font-style: italic; overflow-wrap: anywhere; }
+.step .nums, .step .today-actions { margin-top: .35rem; }
+.step .today-actions { padding-top: .25rem; }
+
+/* round number that becomes a check once ticked */
+.step__tick {
+  position: relative; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; padding: 0;
+  border-radius: 50%; border: 1.5px solid rgb(var(--tint) / .3); background: transparent; color: var(--ink-70);
+  font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s, transform .2s;
+}
+.step__tick::before { content: attr(data-n); }
+.step__tick--static { cursor: default; }
+.step__tick[aria-pressed="true"], .step__tick.is-on { background: var(--accent-teal); border-color: var(--accent-teal); color: var(--on-ink); }
+.step__tick[aria-pressed="true"]::before, .step__tick.is-on::before { content: "\2713"; font-size: 1rem; }
+.step__tick:not(.step__tick--static):active { transform: scale(.94); }
+.step__tick:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 3px; }
+
+/* ---- coming up ---- */
+.upnext { display: grid; gap: .5rem; min-width: 0; }
+.upnext__title { margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-70); }
+.upnext__list { margin: 0; display: grid; gap: 0; border-top: 1px solid rgb(var(--tint) / .1); }
+.upnext__row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid rgb(var(--tint) / .1); }
+.upnext__row dt { font-size: .92rem; color: var(--ink-70); }
+.upnext__row dd { margin: 0; font-size: .92rem; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* ---- Blue's tip inside Today ---- */
+.bp-tip {
+  display: grid; gap: .4rem; min-width: 0; padding: .9rem 1rem; border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--tint) / .12); background: rgb(var(--tint) / .05); box-shadow: inset 3px 0 0 var(--accent-teal);
+}
+.bp-tip__tag { margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-teal); }
+.bp-tip__text { margin: 0; max-width: none; font-size: .97rem; line-height: 1.55; color: var(--ink); overflow-wrap: anywhere; }
+.bp-tip .btn { justify-self: start; padding-left: 0; }
+.bp-tip.is-loading .bp-tip__text { color: transparent; border-radius: 6px; min-height: 1.4em;
+  background: linear-gradient(90deg, rgb(var(--tint) / .08), rgb(var(--tint) / .2), rgb(var(--tint) / .08)); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+
+/* ---- "Blue suggests" tab: numbered, ticked, "start here" first ---- */
+.tips__why { margin: 0; max-width: none; font-size: .86rem; line-height: 1.45; color: var(--ink-70); }
+.tips__foot { margin: 0; max-width: none; font-size: .8rem; line-height: 1.45; color: var(--ink-50); }
+.tips.blue-note .tip {
+  display: grid; grid-template-columns: 1.9rem minmax(0, 1fr) 2.5rem; gap: .75rem; align-items: start;
+  padding: .85rem 0; border-top: 1px solid rgb(var(--tint) / .1);
+}
+.tips.blue-note .tip:first-child { padding-top: .35rem; }
+.tips.blue-note .tip:last-child { padding-bottom: .35rem; }
+.tip__num {
+  display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  background: rgb(var(--tint) / .1); color: var(--ink-70); font-size: .8rem; font-weight: 600;
+}
+.tip__main { display: grid; gap: .35rem; min-width: 0; }
+.tip__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0; max-width: none; }
+.tips.blue-note .tip__kind { width: auto; min-width: 0; justify-self: auto; }
+.tip__flag { padding: .15rem .55rem; border-radius: var(--radius-full); background: var(--accent-violet); color: #fff; font-size: .66rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.tips.blue-note .tip__text { margin: 0; max-width: none; }
+.tip.is-done .tip__text { color: var(--ink-50); text-decoration: line-through; text-decoration-color: rgb(var(--tint) / .3); }
+.tip.is-done .tip__num { background: var(--accent-teal); color: var(--on-ink); }
+
+.tip__tick {
+  position: relative; justify-self: end; width: 2.5rem; height: 2.5rem; padding: 0; border-radius: 50%;
+  border: 1.5px solid rgb(var(--tint) / .3); background: transparent; color: var(--on-ink); cursor: pointer;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.tip__tick::after { content: "\2713"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 1rem; opacity: 0; }
+.tip__tick[aria-pressed="true"] { background: var(--accent-teal); border-color: var(--accent-teal); }
+.tip__tick[aria-pressed="true"]::after { opacity: 1; }
+.tip__tick:active { transform: scale(.94); }
+.tip__tick:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 3px; }
+
+@media (max-width: 520px) {
+  .step { grid-template-columns: 2rem minmax(0, 1fr); gap: .65rem; padding: .8rem .85rem; }
+  .step__tick { width: 2rem; height: 2rem; }
+  .journey__name { font-size: .6rem; }
+  .tips.blue-note .tip { grid-template-columns: 1.7rem minmax(0, 1fr) 2.5rem; gap: .6rem; }
+  .tip__num { width: 1.7rem; height: 1.7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach--bubble, .bp-tip.is-loading .bp-tip__text { animation: none !important; }
+  .steps__meter > i, .step, .step__tick, .tip__tick { transition: none; }
+}

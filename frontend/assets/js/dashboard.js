@@ -5,8 +5,10 @@
  *   today's status pill and a one-line progress insight with a mini weekly chart.
  * OPENED (tap a cover): three tabs
  *   Today          check-in circle, Blue's message, today's numbers, off day, missed
+ *   Today          Blue's coaching flow: stage + message, a 3-step plan for today
+ *                  (get ready -> do it -> check in), what's coming up, Blue's top tip
  *   Insights       adherence tiles + weekly chart
- *   Blue suggests  AI suggestions
+ *   Blue suggests  numbered suggestions with a tick for each one
  *
  * Blue's message and suggestions load only when a plan is opened (fewer AI calls).
  * One plan is open at a time.
@@ -104,6 +106,76 @@ const TIP_LABEL = {
   mindset: 'Mindset',
 };
 
+/* ------------------------------------------- small local helpers (per day) */
+
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+function readStore(key) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+function writeStore(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* private mode */ }
+}
+
+// Ticks live only on this device and only for today: old days are removed on load.
+const stepKey = (p) => `quiter-steps:${p.user_plan_id}:${localDay()}`;
+const tipKey = (p) => `quiter-tips:${p.user_plan_id}:${localDay()}`;
+
+function pruneOldTicks() {
+  try {
+    const today = localDay();
+    Object.keys(localStorage)
+      .filter((k) => (k.startsWith('quiter-steps:') || k.startsWith('quiter-tips:')) && !k.endsWith(`:${today}`))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch { /* private mode */ }
+}
+
+function stepsDone(p) {
+  if (!p._steps) p._steps = new Set(readStore(stepKey(p)));
+  return p._steps;
+}
+
+function tipsDone(p) {
+  if (!p._tipsDone) p._tipsDone = new Set(readStore(tipKey(p)));
+  return p._tipsDone;
+}
+
+const tipHash = (t) => {
+  let h = 0;
+  for (const c of `${t.k}|${t.t}`) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return String(h);
+};
+
+const short = (text, n) => {
+  const t = String(text || '').trim();
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
+
+// "Day 5: Walk 20 minutes" -> "Walk 20 minutes" (the day is already in Blue's header).
+const stripDay = (text) => String(text || '').replace(/^\s*Day\s+\d+\s*[:\-—]\s*/i, '').trim();
+
+const wasMissed = (p) => ['missed', 'relapsed'].includes(p.today_status);
+
+const inDays = (n) => (n === 1 ? 'tomorrow' : `in ${n} days`);
+
+/* ----------------------------------------------- Blue suggestions (tab) */
+
+// Why Blue is saying this: the real numbers behind the suggestions.
+function tipsWhy(p) {
+  const bits = [`Day ${p.day_number} of ${p.total_days}`];
+  if (p.current_streak > 0) bits.push(`${p.current_streak}-day streak`);
+  const l7 = p._an?.summary?.last7_pct;
+  if (l7 !== null && l7 !== undefined) bits.push(`${Number(l7)}% of the last 7 days`);
+  return bits.join(' · ');
+}
+
 // p.tips === undefined means "not loaded yet" (shimmer). [] means "nothing to show".
 function tipsHtml(p) {
   if (p.is_completed || p.is_abandoned) return '';
@@ -117,20 +189,288 @@ function tipsHtml(p) {
 
   if (!p.tips.length) return '';
 
+  const mine = tipsDone(p);
+  const count = p.tips.filter((t) => mine.has(tipHash(t))).length;
+
   return `<div class="tips blue-note">
     <p class="tips__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue suggests</p>
-    <ul class="tips__list">${p.tips.map((t) =>
-      `<li class="tip">
-        <span class="tip__kind tip__kind--${esc(t.k)}">${esc(TIP_LABEL[t.k] || 'Tip')}</span>
-        <span class="tip__text">${esc(t.t)}</span>
-      </li>`
-    ).join('')}</ul>
+    <p class="tips__why">${esc(tipsWhy(p))}</p>
+    <ol class="tips__list">${p.tips.map((t, i) => {
+      const on = mine.has(tipHash(t));
+      const label = TIP_LABEL[t.k] || 'Tip';
+
+      return `<li class="tip${on ? ' is-done' : ''}">
+        <span class="tip__num" aria-hidden="true">${i + 1}</span>
+        <div class="tip__main">
+          <p class="tip__meta">
+            <span class="tip__kind tip__kind--${esc(t.k)}">${esc(label)}</span>
+            ${i === 0 ? '<span class="tip__flag">Start here</span>' : ''}
+          </p>
+          <p class="tip__text">${esc(t.t)}</p>
+        </div>
+        <button class="tip__tick" type="button" data-tip="${i}" aria-pressed="${on}"
+          aria-label="${esc(`Mark done: ${t.t}`)}"></button>
+      </li>`;
+    }).join('')}</ol>
+    <p class="tips__foot"><span data-tips-count>${count} of ${p.tips.length}</span> done today · Blue updates these after each check-in.</p>
   </div>`;
 }
 
 const tipsPane = (p) => tipsHtml(p)
   || '<p class="pane-empty">No suggestions right now. Keep checking in and Blue will adapt.</p>';
 
+/* --------------------------------------------------- Blue's coaching flow */
+
+const STAGE_ORDER = ['start', 'early', 'build', 'final'];
+
+const STAGES = {
+  start: ['Getting started', 'Keep it easy. Your only job right now is to show up.'],
+  early: ['Building the habit', 'This first week is about rhythm, not intensity.'],
+  build: ['In the groove', 'Now we make it automatic. Small and steady wins.'],
+  final: ['Final stretch', 'Finish what you started. Every check-in counts.'],
+};
+
+// Same thresholds Blue uses on the server (blue_ai._stage), so both always agree.
+function stageOf(p) {
+  const day = p.day_number;
+  const total = p.total_days;
+
+  if (day <= 3) return 'start';
+  if (total - day <= Math.max(1, Math.round(total * 0.12))) return 'final';
+  if (day <= 7) return 'early';
+  return 'build';
+}
+
+function journeyHtml(p) {
+  const now = stageOf(p);
+  const idx = STAGE_ORDER.indexOf(now);
+  const [label, blurb] = STAGES[now];
+
+  return `<div class="bp-head">
+      <span class="blue-dot" aria-hidden="true"></span>
+      <div class="bp-head__copy">
+        <p class="bp-head__tag">Blue · your coach</p>
+        <p class="bp-head__stage">Day ${p.day_number} of ${p.total_days} · ${esc(label)}</p>
+      </div>
+    </div>
+    <ol class="journey" aria-label="Plan stages">${STAGE_ORDER.map((k, i) =>
+      `<li class="journey__seg${i < idx ? ' is-past' : ''}${i === idx ? ' is-now' : ''}"${i === idx ? ' aria-current="step"' : ''}>
+        <span class="journey__bar"></span><span class="journey__name">${esc(STAGES[k][0])}</span>
+      </li>`).join('')}</ol>
+    <p class="bp-blurb">${esc(blurb)}</p>`;
+}
+
+// Blue's message: loaded / loading / failed (with a retry, never silently missing).
+function coachHtml(p) {
+  if (p.is_completed || p.is_abandoned) return '';
+
+  if (p.coach_message) {
+    return `<div class="coach coach--bubble blue-note" data-coach>
+      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+      <p class="coach__text blue-note__text">${esc(p.coach_message)}</p>
+    </div>`;
+  }
+
+  if (p._coachFailed) {
+    return `<div class="coach coach--bubble blue-note is-failed" data-coach>
+      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+      <p class="coach__text blue-note__text">I couldn’t load today’s message just now.</p>
+      <div><button class="btn btn--text btn--sm" type="button" data-coach-retry>Try again</button></div>
+    </div>`;
+  }
+
+  return `<div class="coach coach--bubble blue-note is-loading" data-coach>
+    <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+    <p class="coach__text blue-note__text">Blue is writing today’s message…</p>
+  </div>`;
+}
+
+function paintCoach(p) {
+  const box = cardEl(p)?.querySelector('[data-coach]');
+  if (box) box.outerHTML = coachHtml(p);
+}
+
+// Three steps, always in the same order: get ready -> do it -> check in.
+function stepsHtml(p, { athlete, done, usual, checkRow, links }) {
+  const goal = short(cleanGoal(p), 80);
+  const mine = stepsDone(p);
+  const goalStep = stripDay(p.micro_goal);
+
+  const first = athlete
+    ? { title: 'Get ready', text: goalStep || `Get set for today’s session on ${goal}.`, sub: p.identity_cue }
+    : { title: 'Remember why', text: p.identity_cue || `You chose ${goal} for a reason.`, sub: '' };
+
+  const second = athlete
+    ? {
+        title: 'Do your numbers',
+        text: usual
+          ? 'Your usual numbers are below. Same as always? One tap logs them.'
+          : 'Do today’s session, then log what you did.',
+      }
+    : { title: 'Take today’s step', text: goalStep || `One small action on ${goal}.`, sub: '' };
+
+  const missed = done && wasMissed(p);
+  const won = done && !missed;
+  const count = won ? 3 : mine.size;
+
+  const tick = (i, title) => (won
+    ? `<span class="step__tick is-on" data-n="${i + 1}" aria-hidden="true"></span>`
+    : `<button class="step__tick" type="button" data-step="${i}" data-n="${i + 1}"
+         aria-pressed="${mine.has(i)}" aria-label="${esc(`Mark “${title}” as done`)}"></button>`);
+
+  const item = (i, step, extra = '') => `<li class="step${won || mine.has(i) ? ' is-done' : ''}">
+      ${tick(i, step.title)}
+      <div class="step__body">
+        <p class="step__title">${esc(step.title)}</p>
+        <p class="step__text">${esc(step.text)}</p>
+        ${step.sub ? `<p class="step__sub">${esc(step.sub)}</p>` : ''}
+        ${extra}
+      </div>
+    </li>`;
+
+  const checkText = missed
+    ? 'Logged as missed. No shame in that. Tomorrow is a fresh start and Blue will be here.'
+    : done
+      ? 'Nice work. Today is logged and your streak is safe.'
+      : 'Tick it when you’re done. This is what keeps your streak alive.';
+
+  return `<section class="steps" aria-label="Your plan for today">
+    <div class="steps__head">
+      <p class="steps__title">Your plan for today</p>
+      <p class="steps__count" data-step-count>${count} of 3</p>
+    </div>
+    <div class="steps__meter" aria-hidden="true"><i data-step-meter style="width:${Math.round((count / 3) * 100)}%"></i></div>
+    <ol class="steps__list">
+      ${item(0, first)}
+      ${item(1, second, exerciseBlock(p))}
+      <li class="step step--check${won ? ' is-done' : ''}">
+        <span class="step__tick step__tick--static${won ? ' is-on' : ''}" data-n="3" aria-hidden="true"></span>
+        <div class="step__body">
+          <p class="step__title">Check in</p>
+          <p class="step__text">${esc(checkText)}</p>
+          <div class="today-actions">${checkRow}${links}</div>
+        </div>
+      </li>
+    </ol>
+  </section>`;
+}
+
+// What is next on the road: the next milestone, streak goal and rest day (no AI, no cost).
+function comingUp(p) {
+  if (p.is_completed || p.is_abandoned) return [];
+
+  const day = p.day_number;
+  const total = p.total_days;
+  const left = total - day;
+  const items = [];
+
+  const o = p.off_day;
+  if (o && typeof o.weekday === 'number' && !o.is_off_today) {
+    items.push(['Rest day', `${WEEKDAYS[o.weekday]}s`]);
+  }
+
+  const goals = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
+  const nextStreak = goals.find((g) => g > p.current_streak);
+  if (nextStreak && nextStreak <= total) {
+    items.push(['Next streak goal', `${nextStreak} days · ${nextStreak - p.current_streak} to go`]);
+  }
+
+  const half = Math.floor((total + 1) / 2);
+  const finalStart = total - Math.max(1, Math.round(total * 0.12));
+
+  if (day < half && total >= 6) items.push(['Halfway point', inDays(half - day)]);
+  else if (day < finalStart && total >= 8) items.push(['Final stretch', inDays(finalStart - day)]);
+  else if (left > 0) items.push(['Finish line', inDays(left)]);
+
+  return items.slice(0, 3);
+}
+
+function comingUpHtml(p) {
+  const items = comingUp(p);
+  if (!items.length) return '';
+
+  return `<section class="upnext" aria-label="Coming up">
+    <p class="upnext__title">Coming up</p>
+    <dl class="upnext__list">${items.map(([k, v]) =>
+      `<div class="upnext__row"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`
+    ).join('')}</dl>
+  </section>`;
+}
+
+// Blue's first suggestion, right inside today's flow (the full list is one tap away).
+function tipTeaserHtml(p) {
+  if (p.is_completed || p.is_abandoned) return '';
+
+  if (!p.tips) {
+    return `<div class="bp-tip is-loading" aria-busy="true">
+      <p class="bp-tip__tag">Blue’s tip for today</p>
+      <p class="bp-tip__text">Reading your progress…</p>
+    </div>`;
+  }
+
+  const t = p.tips[0];
+  if (!t) return '';
+
+  return `<div class="bp-tip">
+    <p class="bp-tip__tag">Blue’s tip for today · ${esc(TIP_LABEL[t.k] || 'Tip')}</p>
+    <p class="bp-tip__text">${esc(t.t)}</p>
+    <button class="btn btn--text btn--sm" type="button" data-goto-tab="blue">${p.tips.length > 1 ? `See all ${p.tips.length} suggestions` : 'Open suggestions'}</button>
+  </div>`;
+}
+
+function paintTips(p) {
+  const card = cardEl(p);
+  if (!card) return;
+
+  const box = card.querySelector('[data-tips]');
+  if (box) box.innerHTML = tipsPane(p);
+
+  const teaser = card.querySelector('[data-tip-teaser]');
+  if (teaser) teaser.innerHTML = tipTeaserHtml(p);
+}
+
+function paintStepProgress(card, p) {
+  const n = todayState(p).done && !wasMissed(p) ? 3 : stepsDone(p).size;
+  const count = card.querySelector('[data-step-count]');
+  const meter = card.querySelector('[data-step-meter]');
+
+  if (count) count.textContent = `${n} of 3`;
+  if (meter) meter.style.width = `${Math.round((n / 3) * 100)}%`;
+}
+
+function toggleStep(p, i) {
+  const mine = stepsDone(p);
+  if (mine.has(i)) mine.delete(i); else mine.add(i);
+  writeStore(stepKey(p), [...mine]);
+
+  const card = cardEl(p);
+  const btn = card?.querySelector(`[data-step="${i}"]`);
+  if (!btn) return;
+
+  btn.setAttribute('aria-pressed', String(mine.has(i)));
+  btn.closest('.step')?.classList.toggle('is-done', mine.has(i));
+  paintStepProgress(card, p);
+}
+
+function toggleTip(p, i) {
+  const t = p.tips?.[i];
+  if (!t) return;
+
+  const mine = tipsDone(p);
+  const h = tipHash(t);
+  if (mine.has(h)) mine.delete(h); else mine.add(h);
+  writeStore(tipKey(p), [...mine]);
+
+  const card = cardEl(p);
+  const btn = card?.querySelector(`[data-tip="${i}"]`);
+  if (!btn) return;
+
+  btn.setAttribute('aria-pressed', String(mine.has(h)));
+  btn.closest('.tip')?.classList.toggle('is-done', mine.has(h));
+
+  const count = card.querySelector('[data-tips-count]');
+  if (count) count.textContent = `${p.tips.filter((x) => mine.has(tipHash(x))).length} of ${p.tips.length}`;
+}
 /* ------------------------------------------------------ athlete numbers */
 
 const STEP = {
@@ -538,13 +878,7 @@ function tabOf(p) {
 function todayPane(p) {
   const { athlete, done, isOff } = todayState(p);
   const usual = athlete && p.tracked_exercises?.some(hasDefault);
-
-  const coach = p.coach_message || !p._coachFailed
-    ? `<div class="coach blue-note ${p.coach_message ? '' : 'is-loading'}" data-coach>
-        <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
-        <p class="coach__text blue-note__text">${esc(p.coach_message || 'Blue is writing today’s message…')}</p>
-      </div>`
-    : '';
+  const rest = isOff && !done;
 
   const offToggle = athlete && !done
     ? `<button class="btn btn--glass liquid-glass btn--sm btn--off${isOff ? ' is-on' : ''}"
@@ -552,42 +886,44 @@ function todayPane(p) {
     : '';
 
   const checkLabel = done
-    ? (athlete ? 'Done for today' : 'Marked as on track')
+    ? (wasMissed(p) ? 'Logged as missed' : athlete ? 'Done for today' : 'Marked as on track')
     : usual
       ? 'I did my usual numbers today'
       : "Yes, I'm on track today";
 
-  const focus = p.micro_goal || p.identity_cue
-    ? `<div class="today-focus">
-        <p class="today-focus__label">Today’s focus</p>
-        ${p.micro_goal ? `<p class="today__goal">${esc(p.micro_goal)}</p>` : ''}
-        ${p.identity_cue ? `<p class="today__cue">${esc(p.identity_cue)}</p>` : ''}
-      </div>`
-    : '';
-
-  return `
-    ${focus}
-    ${coach}
-    ${exerciseBlock(p)}
-    ${offNote(p)}
-    <div class="today-actions">
-      <div class="plan__primary">
-        <label class="q-check q-check--lg">
-          <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
-          <span class="q-check__box"></span>
-          <span class="q-check__label">${checkLabel}</span>
-        </label>
-        ${offToggle}
-      </div>
-      <div class="plan__links">
-        ${athlete && !done && p.tracked_exercises?.length
-          ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-edit-toggle>Numbers changed today?</button>'
-          : ''}
-        ${!done && !isOff
-          ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>'
-          : ''}
-      </div>
+  const checkRow = `<div class="plan__primary">
+      <label class="q-check q-check--lg">
+        <input type="checkbox" data-done ${done ? 'checked disabled' : ''}>
+        <span class="q-check__box"></span>
+        <span class="q-check__label">${checkLabel}</span>
+      </label>
+      ${offToggle}
     </div>`;
+
+  const links = `<div class="plan__links">
+      ${athlete && !done && p.tracked_exercises?.length
+        ? '<button class="btn btn--glass liquid-glass btn--sm" type="button" data-edit-toggle>Numbers changed today?</button>'
+        : ''}
+      ${!done && !isOff
+        ? '<button class="btn btn--text btn--sm" type="button" data-miss>I missed today</button>'
+        : ''}
+    </div>`;
+
+  // Rest day: no steps to push, just permission to recover.
+  const plan = rest
+    ? `<section class="steps steps--rest">
+        ${offNote(p)}
+        <div class="plan__primary">${offToggle}</div>
+      </section>`
+    : stepsHtml(p, { athlete, done, usual, checkRow, links });
+
+  return `<div class="blueplan">
+    <div class="bp-top">${journeyHtml(p)}</div>
+    ${coachHtml(p)}
+    ${plan}
+    ${comingUpHtml(p)}
+    <div data-tip-teaser>${tipTeaserHtml(p)}</div>
+  </div>`;
 }
 
 function cardHtml(p) {
@@ -763,26 +1099,19 @@ async function loadCoach(p) {
   if (p._coachBusy || p.coach_message || p.is_completed || p.is_abandoned) return;
 
   p._coachBusy = true;
+  p._coachFailed = false;
 
   try {
     const { message } = await api.get(`/plans/${p.user_plan_id}/coach-message`);
     if (message) p.coach_message = message;
   } catch {
-    // fall through: no message
+    // fall through: show the retry state below
   }
 
   p._coachBusy = false;
   if (!p.coach_message) p._coachFailed = true;
 
-  const box = cardEl(p)?.querySelector('[data-coach]');
-  if (!box) return;
-
-  if (p.coach_message) {
-    box.classList.remove('is-loading');
-    box.querySelector('.coach__text').textContent = p.coach_message;
-  } else {
-    box.remove();
-  }
+  paintCoach(p);
 }
 
 async function loadTips(p) {
@@ -797,9 +1126,7 @@ async function loadTips(p) {
   }
 
   p._tipsBusy = false;
-
-  const box = cardEl(p)?.querySelector('[data-tips]');
-  if (box) box.innerHTML = tipsPane(p);
+  paintTips(p);
 }
 
 // Blue (AI) is only asked when a plan is opened.
@@ -853,6 +1180,7 @@ async function complete(p, entries) {
   }
 
   p.already_logged_today = true;
+  p.today_status = 'completed';
 
   if (result) {
     p.current_streak = result.current_streak;
@@ -897,6 +1225,32 @@ listEl.addEventListener('click', async (e) => {
   if (!p) return;
 
   const err = card.querySelector('[data-error]');
+
+  // Blue's coaching flow: step ticks, suggestion ticks, shortcuts.
+  const stepBtn = e.target.closest('[data-step]');
+  if (stepBtn) {
+    toggleStep(p, Number(stepBtn.dataset.step));
+    return;
+  }
+
+  const tipBtn = e.target.closest('[data-tip]');
+  if (tipBtn) {
+    toggleTip(p, Number(tipBtn.dataset.tip));
+    return;
+  }
+
+  const gotoTab = e.target.closest('[data-goto-tab]');
+  if (gotoTab) {
+    selectTab(card, p, gotoTab.dataset.gotoTab);
+    return;
+  }
+
+  if (e.target.closest('[data-coach-retry]')) {
+    p._coachFailed = false;
+    paintCoach(p);
+    loadCoach(p);
+    return;
+  }
 
   // Graph tabs (Days marked / each exercise).
   const fcBtn = e.target.closest('[data-fc-tab]');
@@ -1052,6 +1406,7 @@ listEl.addEventListener('click', async (e) => {
       const r = await api.post(`/plans/${p.user_plan_id}/checkin`, { status: 'missed' });
 
       p.already_logged_today = true;
+      p.today_status = 'missed';
       p.current_streak = r.current_streak ?? 0;
 
       refreshAfterProgress(p);
@@ -1065,6 +1420,8 @@ listEl.addEventListener('click', async (e) => {
 
 export async function initDashboard(user) {
   const now = new Date();
+  
+  pruneOldTicks();
 
   document.getElementById('today-date').textContent =
     now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });

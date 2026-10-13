@@ -459,6 +459,11 @@ def my_plans():
             "micro_goal": plan_day.micro_goal if plan_day else None,
             "identity_cue": plan_day.identity_cue if plan_day else None,
             "already_logged_today": already_logged is not None,
+            # "completed" / "missed" / "partial" / "relapsed" / None: lets the dashboard tell a miss from a win.
+            "today_status": (
+                getattr(already_logged.status, "value", already_logged.status)
+                if already_logged is not None else None
+            ),
             "off_day": {
                 "is_off_today": _is_off(up, today),
                 "weekday": off_config(up.athletic_metadata).get("weekday"),
