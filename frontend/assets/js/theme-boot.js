@@ -18,7 +18,10 @@
      - photos in/near the first screen are loaded (<img> and inline background-image, e.g. the flower poster)
      - nothing new has been added to the page for QUIET_MS (so API-loaded cards and photos get a moment)
    It never shows for less than MIN_MS, and never for more than MAX_MS (a slow network can't trap anyone).
-   Tune the feel with the three numbers below. */
+   Tune the feel with the three numbers below.
+
+   First visit on the home page: when the splash lifts, the html element gets .intro-play and the CSS
+   (layout.css, "First-visit intro") runs stars -> hero text -> flower reveal. */
 (function () {
   var root = document.documentElement;
   var firstVisit = true;
@@ -31,6 +34,10 @@
   var MAX_MS = 4500;                     // longest time, whatever is still loading
   var QUIET_MS = 250;                    // how long the page must stay "still" before we reveal it
   var t0 = Date.now();
+
+  // intro sequence: home page only, first visit of the session, not for reduced-motion users
+  var intro = firstVisit && /(^|\/)(index\.html)?$/.test(location.pathname) &&
+    !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---- look: Blue's dot + wordmark + a thin progress sweep, on the theme's own colours ---- */
   var css = [
@@ -66,6 +73,7 @@
     '<span class="splash__word">Quiter</span><span class="splash__bar"><i></i></span></div>';
 
   root.classList.add('is-loading');
+  if (intro) root.classList.add('intro-pending');
   root.appendChild(style);
   root.appendChild(el);
 
@@ -146,6 +154,10 @@
     var wait = Math.max(0, MIN_MS - (Date.now() - t0));
     setTimeout(function () {
       root.classList.remove('is-loading');
+      if (intro) {
+        requestAnimationFrame(function () { root.classList.add('intro-play'); });
+        setTimeout(function () { root.classList.remove('intro-pending', 'intro-play'); }, 8000);
+      }
       setTimeout(function () {                // after the fade-out, remove it for good
         if (el.parentNode) el.parentNode.removeChild(el);
         if (style.parentNode) style.parentNode.removeChild(style);
@@ -158,8 +170,12 @@
     if (ready() || Date.now() - t0 >= MAX_MS) { clearInterval(timer); reveal(); }
   }, 80);
 
-  // Coming back with the Back button (page restored from memory): never show the loading screen again.
+  // Coming back with the Back button (page restored from memory): never show the loading screen or the intro again.
   window.addEventListener('pageshow', function (e) {
-    if (e.persisted) { finished = true; root.classList.remove('is-loading'); if (el.parentNode) el.parentNode.removeChild(el); }
+    if (e.persisted) {
+      finished = true;
+      root.classList.remove('is-loading', 'intro-pending', 'intro-play');
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }
   });
 })();
