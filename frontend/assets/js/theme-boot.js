@@ -20,6 +20,9 @@
    It never shows for less than MIN_MS, and never for more than MAX_MS (a slow network can't trap anyone).
    Tune the feel with the numbers below.
 
+   The screen is the Quiter logo mark: a ring, then rays growing out of it clockwise from the top,
+   the long stem last, then a soft shimmer travelling round the rays until the page is ready.
+
    First visit on the home page: when the splash lifts, the html element gets .intro-play and the CSS
    (layout.css, "First-visit intro") runs stars -> hero text -> flower reveal. */
 (function () {
@@ -30,7 +33,7 @@
     sessionStorage.setItem('quiter-splash', '1');
   } catch (e) { /* private mode */ }
 
-  var MIN_MS = firstVisit ? 900 : 300;   // shortest time the loading screen stays
+  var MIN_MS = firstVisit ? 1500 : 700;  // shortest time the loading screen stays (long enough for the logo to draw)
   var MAX_MS = 4500;                     // longest time, whatever is still loading
   var QUIET_MS = 250;                    // how long the page must stay "still" before we reveal it
   var FADE_MS = 700;                     // how long the splash takes to dissolve
@@ -40,55 +43,61 @@
   var intro = firstVisit && /(^|\/)(index\.html)?$/.test(location.pathname) &&
     !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---- look: glass orb + soft ring + twinkling stars + serif wordmark, on the theme's own colours ---- */
+  /* ---- look: the logo mark, on the theme's own colours ---- */
   var fade = (FADE_MS / 1000) + 's';
   var css = [
     'html.is-loading{overflow:hidden}',
     '#splash{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;overflow:hidden;',
-      'background:radial-gradient(55% 40% at 50% 44%,rgb(141 124 255/.20),transparent 70%),',
-      'radial-gradient(40% 30% at 62% 62%,rgb(63 232 201/.09),transparent 70%),var(--bg,#000);',
-      'color:var(--ink,#fff);opacity:1;filter:blur(0);transform:none;',
+      'background:radial-gradient(50% 36% at 50% 48%,rgb(141 124 255/.14),transparent 70%),var(--bg,#000);',
+      'opacity:1;filter:blur(0);transform:none;',
       'transition:opacity ' + fade + ' ease,filter ' + fade + ' ease,transform ' + fade + ' ease,visibility 0s linear ' + fade + ';',
       'animation:splash-failsafe .01s linear ' + ((MAX_MS + 1500) / 1000) + 's forwards}',
-    'html[data-theme=light] #splash{background:radial-gradient(55% 40% at 50% 44%,rgb(141 124 255/.16),transparent 70%),',
-      'radial-gradient(40% 30% at 62% 62%,rgb(63 232 201/.10),transparent 70%),var(--bg,#e9ecf6);color:var(--ink,#14161f)}',
+    'html[data-theme=light] #splash{background:radial-gradient(50% 36% at 50% 48%,rgb(141 124 255/.16),transparent 70%),var(--bg,#e9ecf6)}',
     'html:not(.is-loading) #splash{opacity:0;visibility:hidden;pointer-events:none;filter:blur(10px);transform:scale(1.03)}',
 
-    '.splash__stars{position:absolute;inset:0;pointer-events:none}',
-    '.splash__stars i{position:absolute;border-radius:50%;background:currentColor;opacity:0;',
-      'animation:splash-twinkle var(--t,3s) ease-in-out var(--d,0s) infinite}',
+    /* gradient: white at the top -> lavender -> violet at the bottom (deeper indigo on the light theme) */
+    '.splash__s0{stop-color:#fff}.splash__s1{stop-color:#d9d2ff}.splash__s2{stop-color:#8d7cff}',
+    'html[data-theme=light] .splash__s0{stop-color:#9a8cff}',
+    'html[data-theme=light] .splash__s1{stop-color:#6f5cf0}',
+    'html[data-theme=light] .splash__s2{stop-color:#4a36d6}',
 
-    '.splash__box{position:relative;display:grid;justify-items:center;gap:1.7rem}',
-    '.splash__orb{position:relative;width:84px;height:84px;border-radius:50%;',
-      'background:radial-gradient(circle at 32% 28%,rgb(255 255 255/.55),rgb(255 255 255/0) 38%),',
-        'radial-gradient(circle at 70% 78%,rgb(63 232 201/.45),transparent 55%),',
-        'radial-gradient(circle at 40% 40%,rgb(141 124 255/.75),rgb(141 124 255/.25) 70%);',
-      'box-shadow:inset 0 0 0 1px rgb(255 255 255/.28),inset 0 -10px 22px rgb(0 0 0/.18),',
-        '0 0 46px rgb(141 124 255/.45),0 0 120px rgb(141 124 255/.22);',
-      'animation:splash-breathe 3.2s ease-in-out infinite}',
-    '.splash__orb::after{content:"";position:absolute;inset:-10px;border-radius:50%;',
-      'border:1px solid rgb(var(--tint,255 255 255)/.14);border-top-color:var(--accent-teal,#3fe8c9);',
-      'animation:splash-spin 2.4s linear infinite}',
-    '.splash__word{font-family:var(--font-serif,Georgia,serif);font-style:italic;font-size:2.4rem;line-height:1;',
-      'letter-spacing:.04em;opacity:0;animation:splash-word .9s ease .15s forwards}',
+    '.splash__mark{display:block;width:clamp(64px,19vw,84px);height:auto;overflow:visible;',
+      'filter:drop-shadow(0 0 12px rgb(141 124 255/.5)) drop-shadow(0 0 34px rgb(141 124 255/.26))}',
+    '.splash__ring{fill:none;stroke:url(#splash-g);stroke-width:15;opacity:0;',
+      'animation:splash-ring calc(.7s*var(--k,1)) ease both,',
+      'splash-shimmer 2.6s ease-in-out calc(1.5s*var(--k,1)) infinite}',
+    '.splash__ray{fill:none;stroke:url(#splash-g);stroke-width:16;stroke-linecap:round;',
+      'stroke-dasharray:var(--L) 400;stroke-dashoffset:var(--L);opacity:0;',
+      'animation:splash-ray calc(.55s*var(--k,1)) cubic-bezier(.22,.8,.3,1) calc(var(--d)*var(--k,1)) forwards,',
+      'splash-shimmer 2.6s ease-in-out calc((var(--d) + 1.6s)*var(--k,1)) infinite}',
 
-    '@keyframes splash-twinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.85;transform:scale(1)}}',
-    '@keyframes splash-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}',
-    '@keyframes splash-spin{to{transform:rotate(360deg)}}',
-    '@keyframes splash-word{from{opacity:0;transform:translateY(8px);letter-spacing:.14em}to{opacity:1;transform:none;letter-spacing:.04em}}',
+    '@keyframes splash-ring{from{opacity:0}to{opacity:1}}',
+    '@keyframes splash-ray{0%{stroke-dashoffset:var(--L);opacity:0}12%{opacity:1}100%{stroke-dashoffset:0;opacity:1}}',
+    '@keyframes splash-shimmer{0%,100%{opacity:1}50%{opacity:.5}}',
     '@keyframes splash-failsafe{to{opacity:0;visibility:hidden;pointer-events:none}}',
-    '@media (prefers-reduced-motion:reduce){.splash__stars i,.splash__orb,.splash__orb::after{animation:none}',
-      '.splash__stars i{opacity:.5}.splash__word{animation:none;opacity:1}}'
+    '@media (prefers-reduced-motion:reduce){.splash__ring,.splash__ray{animation:none;opacity:1;stroke-dashoffset:0}}'
   ].join('');
 
-  // a fixed scatter of small stars (same layout every time, no randomness needed)
-  var stars = '', seed = 7;
-  function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
-  for (var s = 0; s < 28; s++) {
-    var sz = (1.5 + rnd() * 2.5).toFixed(1);
-    stars += '<i style="left:' + (rnd() * 100).toFixed(1) + '%;top:' + (rnd() * 100).toFixed(1) + '%;' +
-      'width:' + sz + 'px;height:' + sz + 'px;--t:' + (2.4 + rnd() * 2).toFixed(1) + 's;--d:' + (rnd() * 3).toFixed(1) + 's"></i>';
+  // rays: x1, y1, x2, y2, start delay (s), length. Clockwise from the top; the long bottom stem comes last-but-two.
+  var rays = [
+    [120, 68, 120, 24, 0.30, 44],        // top
+    [156.8, 83.2, 187.9, 52.1, 0.42, 44], // top-right
+    [172, 120, 216, 120, 0.54, 44],      // right
+    [120, 166, 120, 272, 0.66, 106],     // bottom stem (long)
+    [68, 120, 24, 120, 0.78, 44],        // left
+    [83.2, 83.2, 52.1, 52.1, 0.90, 44]   // top-left
+  ];
+  var lines = '';
+  for (var r = 0; r < rays.length; r++) {
+    var q = rays[r];
+    lines += '<line class="splash__ray" x1="' + q[0] + '" y1="' + q[1] + '" x2="' + q[2] + '" y2="' + q[3] +
+      '" style="--d:' + q[4] + ';--L:' + q[5] + '"/>';
   }
+  var mark = '<svg class="splash__mark" viewBox="0 0 240 296" aria-hidden="true" focusable="false">' +
+    '<defs><linearGradient id="splash-g" gradientUnits="userSpaceOnUse" x1="0" y1="16" x2="0" y2="280">' +
+    '<stop offset="0" class="splash__s0"/><stop offset=".4" class="splash__s1"/><stop offset=".9" class="splash__s2"/>' +
+    '</linearGradient></defs>' +
+    '<circle class="splash__ring" cx="120" cy="120" r="38.5"/>' + lines + '</svg>';
 
   var style = document.createElement('style');
   style.id = 'splash-css';
@@ -97,8 +106,8 @@
   el.id = 'splash';
   el.setAttribute('role', 'status');
   el.setAttribute('aria-label', 'Loading Quiter');
-  el.innerHTML = '<div class="splash__stars">' + stars + '</div>' +
-    '<div class="splash__box"><span class="splash__orb"></span><span class="splash__word">Quiter</span></div>';
+  el.style.setProperty('--k', firstVisit ? '1' : '.45');   // repeat visits: the logo draws faster
+  el.innerHTML = mark;
 
   root.classList.add('is-loading');
   if (intro) root.classList.add('intro-pending');
