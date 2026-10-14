@@ -22,9 +22,9 @@
  * Crash-proofing:
  *   - The clip is attached only once the page has settled, so quick redirects never start a decode.
  *   - The hardware decoder is released on pagehide (every navigation).
+ *   - If the page survives a pagehide (the clip was released), the next swipe or pageshow reattaches it.
  *   - Back-button / tab restore and theme switches reload the clip from the last good frame.
  *   - Errors retry up to 3 times; the poster image stays visible meanwhile.
- *   - The other theme's clip is pre-fetched in the background so theme switches are fast.
  *
  * Tune the feel with the constants below.
  */
@@ -220,6 +220,7 @@ export function initBackground() {
     const now = performance.now();
     if (now - lastPlayTry < 200) return;       // a refused play() must not be retried every frame
     lastPlayTry = now;
+    if (!video.getAttribute('src')) loadClip(clipTime);   // clip was released (pagehide) but the page stayed alive: reattach
     playing = true;
     const p = video.play();
     if (p && p.catch) p.catch(() => { playing = false; });
@@ -304,7 +305,7 @@ export function initBackground() {
     loadClip(clipTime);
   }
   window.addEventListener('pagehide', release);
-  window.addEventListener('pageshow', (e) => { if (e.persisted) recover(); });
+  window.addEventListener('pageshow', (e) => { if (e.persisted || !video.getAttribute('src')) recover(); });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && attached && (video.error || video.readyState < 2)) recover();
   });
