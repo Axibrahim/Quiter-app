@@ -181,6 +181,9 @@ def create_app(config_name: str = "production") -> Flask:
         if path.endswith(".html"):
             return serve_html(path)
         resp = send_from_directory(frontend_dir, path)
+        if path.startswith("assets/media/"):
+            resp.headers["Cache-Control"] = "public, max-age=604800"   # flower clips: cached for a week, so theme switches are instant
+
         if path == "sw.js":
             resp.headers["Cache-Control"] = "no-cache"
             resp.headers["Service-Worker-Allowed"] = "/"
