@@ -24,6 +24,7 @@
  *   - The hardware decoder is released on pagehide (every navigation).
  *   - Back-button / tab restore and theme switches reload the clip from the last good frame.
  *   - Errors retry up to 3 times; the poster image stays visible meanwhile.
+ *   - The other theme's clip is pre-fetched in the background so theme switches are fast.
  *
  * Tune the feel with the constants below.
  */
@@ -124,6 +125,15 @@ export function initBackground() {
   const attachSoon = () => { if ('requestIdleCallback' in window) requestIdleCallback(attach, { timeout: 1500 }); else setTimeout(attach, 400); };
   if (document.readyState === 'complete') attachSoon(); else window.addEventListener('load', attachSoon, { once: true });
   ['touchstart', 'wheel', 'scroll', 'keydown'].forEach((ev) => window.addEventListener(ev, attach, { once: true, passive: true }));
+
+  // Warm the cache with the OTHER theme's clip, so switching theme doesn't wait on a multi-MB download
+  function warmOtherTheme() {
+    const c = navigator.connection;
+    if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return;   // don't burn data on slow / saver connections
+    const other = `assets/media/glass-flower-${small ? 'mobile-' : ''}60${isLightTheme() ? '' : '-light'}.mp4`;
+    fetch(other).then((r) => r.blob()).catch(() => {});
+  }
+  setTimeout(() => { if (!document.hidden) warmOtherTheme(); }, 4000);   // after the page settles; a quick redirect never triggers it
 
   // errors: missing -light clip -> dark clip + CSS filter; anything else -> retry a few times (poster stays visible meanwhile)
   let retries = 0;
