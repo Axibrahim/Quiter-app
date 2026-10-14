@@ -1701,3 +1701,37 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
   .coach--bubble, .bp-tip.is-loading .bp-tip__text { animation: none !important; }
   .steps__meter > i, .step, .step__tick, .tip__tick { transition: none; }
 }
+
+/* ==========================================================================
+   Blue tab + calmer Today (round 2)
+   Today = Blue's message + your 3 steps. Blue tab = where you are, what is coming, suggestions.
+   ========================================================================== */
+
+/* Blue's message header: "Blue" on the left, the stage on the right */
+.coach--bubble .coach__label { display: flex; align-items: center; gap: .5rem; margin-bottom: .1rem; }
+.coach__stage {
+  margin-left: auto; padding: .2rem .65rem; border-radius: var(--radius-full);
+  background: rgb(var(--tint) / .1); color: var(--ink-70);
+  font-size: .72rem; font-weight: 500; letter-spacing: .02em; text-transform: none; white-space: nowrap;
+}
+
+/* the quiet link under today's plan */
+.bp-link {
+  display: flex; align-items: center; gap: .65rem; width: 100%; padding: .85rem 1rem; text-align: left;
+  border-radius: var(--radius-md); border: 1px solid rgb(var(--tint) / .12); background: rgb(var(--tint) / .05);
+  color: var(--ink); font: inherit; font-size: .95rem; cursor: pointer; transition: background .2s, border-color .2s;
+}
+.bp-link:hover { background: rgb(var(--tint) / .09); border-color: rgb(var(--tint) / .2); }
+.bp-link:focus-visible { outline: 2px solid var(--accent-violet); outline-offset: 3px; }
+.bp-link .blue-dot { flex: none; margin: 0; }
+.bp-link__go { margin-left: auto; color: var(--ink-50); font-size: 1.25rem; line-height: 1; }
+
+/* Blue tab: three matching cards, always in the same order */
+.bluetab { display: grid; gap: var(--space-3); min-width: 0; }
+.bt-section, .bluetab .upnext {
+  display: grid; gap: .75rem; min-width: 0; padding: 1rem 1.1rem; border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--tint) / .12); background: rgb(var(--tint) / .05);
+}
+.bluetab .upnext__list { border-top: 0; }
+.bluetab .upnext__row:last-child { border-bottom: 0; padding-bottom: 0; }
+.bluetab .tips.blue-note { margin: 0; }

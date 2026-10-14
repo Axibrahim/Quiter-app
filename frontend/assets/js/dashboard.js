@@ -216,8 +216,16 @@ function tipsHtml(p) {
   </div>`;
 }
 
-const tipsPane = (p) => tipsHtml(p)
-  || '<p class="pane-empty">No suggestions right now. Keep checking in and Blue will adapt.</p>';
+// The whole "Blue" tab: where you are, what is coming, then Blue's numbered suggestions.
+function bluePane(p) {
+  if (p.is_completed || p.is_abandoned) return '';
+
+  return `<div class="bluetab">
+    <section class="bt-section bt-section--stage">${journeyHtml(p)}</section>
+    ${comingUpHtml(p)}
+    ${tipsHtml(p) || '<p class="pane-empty">No suggestions right now. Keep checking in and Blue will adapt.</p>'}
+  </div>`;
+}
 
 /* --------------------------------------------------- Blue's coaching flow */
 
@@ -240,6 +248,8 @@ function stageOf(p) {
   if (day <= 7) return 'early';
   return 'build';
 }
+
+const stageLabel = (p) => STAGES[stageOf(p)][0];
 
 function journeyHtml(p) {
   const now = stageOf(p);
@@ -266,21 +276,21 @@ function coachHtml(p) {
 
   if (p.coach_message) {
     return `<div class="coach coach--bubble blue-note" data-coach>
-      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue<span class="coach__stage">Day ${p.day_number} · ${esc(stageLabel(p))}</span></p>
       <p class="coach__text blue-note__text">${esc(p.coach_message)}</p>
     </div>`;
   }
 
   if (p._coachFailed) {
     return `<div class="coach coach--bubble blue-note is-failed" data-coach>
-      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+      <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue<span class="coach__stage">Day ${p.day_number} · ${esc(stageLabel(p))}</span></p>
       <p class="coach__text blue-note__text">I couldn’t load today’s message just now.</p>
       <div><button class="btn btn--text btn--sm" type="button" data-coach-retry>Try again</button></div>
     </div>`;
   }
 
   return `<div class="coach coach--bubble blue-note is-loading" data-coach>
-    <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue · today’s message</p>
+    <p class="coach__label blue-note__tag"><span class="blue-dot" aria-hidden="true"></span>Blue<span class="coach__stage">Day ${p.day_number} · ${esc(stageLabel(p))}</span></p>
     <p class="coach__text blue-note__text">Blue is writing today’s message…</p>
   </div>`;
 }
@@ -397,25 +407,16 @@ function comingUpHtml(p) {
   </section>`;
 }
 
-// Blue's first suggestion, right inside today's flow (the full list is one tap away).
-function tipTeaserHtml(p) {
-  if (p.is_completed || p.is_abandoned) return '';
+// One quiet link under today's plan; everything else about Blue lives in the Blue tab.
+function blueLinkHtml(p) {
+  if (p.is_completed || p.is_abandoned || !p.tips?.length) return '';
 
-  if (!p.tips) {
-    return `<div class="bp-tip is-loading" aria-busy="true">
-      <p class="bp-tip__tag">Blue’s tip for today</p>
-      <p class="bp-tip__text">Reading your progress…</p>
-    </div>`;
-  }
-
-  const t = p.tips[0];
-  if (!t) return '';
-
-  return `<div class="bp-tip">
-    <p class="bp-tip__tag">Blue’s tip for today · ${esc(TIP_LABEL[t.k] || 'Tip')}</p>
-    <p class="bp-tip__text">${esc(t.t)}</p>
-    <button class="btn btn--text btn--sm" type="button" data-goto-tab="blue">${p.tips.length > 1 ? `See all ${p.tips.length} suggestions` : 'Open suggestions'}</button>
-  </div>`;
+  const n = p.tips.length;
+  return `<button class="bp-link" type="button" data-goto-tab="blue">
+    <span class="blue-dot" aria-hidden="true"></span>
+    <span>Blue has ${n} suggestion${n === 1 ? '' : 's'} for you</span>
+    <span class="bp-link__go" aria-hidden="true">›</span>
+  </button>`;
 }
 
 function paintTips(p) {
@@ -423,10 +424,10 @@ function paintTips(p) {
   if (!card) return;
 
   const box = card.querySelector('[data-tips]');
-  if (box) box.innerHTML = tipsPane(p);
+  if (box) box.innerHTML = bluePane(p);
 
-  const teaser = card.querySelector('[data-tip-teaser]');
-  if (teaser) teaser.innerHTML = tipTeaserHtml(p);
+  const link = card.querySelector('[data-blue-link]');
+  if (link) link.innerHTML = blueLinkHtml(p);
 }
 
 function paintStepProgress(card, p) {
@@ -866,7 +867,7 @@ async function loadForecast(p) {
   paintInsights(p);
 }
 
-const TABS = [['today', 'Today'], ['insights', 'Insights'], ['blue', 'Blue suggests']];
+const TABS = [['today', 'Today'], ['insights', 'Insights'], ['blue', 'Blue']];
 
 const tabsFor = (p) => (p.is_completed ? TABS.filter(([k]) => k === 'insights') : TABS);
 
@@ -918,11 +919,9 @@ function todayPane(p) {
     : stepsHtml(p, { athlete, done, usual, checkRow, links });
 
   return `<div class="blueplan">
-    <div class="bp-top">${journeyHtml(p)}</div>
     ${coachHtml(p)}
     ${plan}
-    ${comingUpHtml(p)}
-    <div data-tip-teaser>${tipTeaserHtml(p)}</div>
+    <div data-blue-link>${blueLinkHtml(p)}</div>
   </div>`;
 }
 
@@ -938,7 +937,7 @@ function cardHtml(p) {
   const panes = {
     today: () => todayPane(p),
     insights: () => `<div data-insights>${insightsHtml(p)}</div>`,
-    blue: () => `<div data-tips>${tipsPane(p)}</div>`,
+    blue: () => `<div data-tips>${bluePane(p)}</div>`,
   };
 
   const tabBar = tabs.length > 1
