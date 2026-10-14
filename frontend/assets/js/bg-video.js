@@ -19,6 +19,12 @@
  *      up slowly from zero. Now the video wakes on the very first touchmove / wheel / scroll event
  *      and starts already at MIN_RATE.
  *
+ * Crash-proofing:
+ *   - The clip is attached only once the page has settled, so quick redirects never start a decode.
+ *   - The hardware decoder is released on pagehide (every navigation).
+ *   - Back-button / tab restore and theme switches reload the clip from the last good frame.
+ *   - Errors retry up to 3 times; the poster image stays visible meanwhile.
+ *
  * Tune the feel with the constants below.
  */
 import { initSiteGL } from './site-gl.js';
@@ -108,25 +114,50 @@ export function initBackground() {
   video.disableRemotePlayback = true;
   const isLightTheme = () => document.documentElement.dataset.theme === 'light';
   const videoSrc = () => `assets/media/glass-flower-${small ? 'mobile-' : ''}60${isLightTheme() ? '-light' : ''}.mp4`;
-  video.src = videoSrc();
-  // if a -light clip is missing, fall back to the dark clip + the old CSS filter (class: needs-filter)
-  video.addEventListener('error', () => {
-    if (isLightTheme() && video.src.includes('-light')) { wrap.classList.add('needs-filter'); video.src = videoSrc().replace('-light', ''); }
-  });
-  // live theme switch: swap the clip but keep the same frame, so the flower doesn't jump
-  addEventListener('quiter:theme', () => {
-    const t = video.currentTime;
-    wrap.classList.remove('needs-filter');
+  // Attach the clip only once the page has settled (or on first touch), so a quick redirect never starts a decode
+  let attached = false;
+  function attach() {
+    if (attached || document.hidden) return;
+    attached = true;
     video.src = videoSrc();
-    appliedRate = 1;
-    video.addEventListener('loadedmetadata', () => { if (video.duration) video.currentTime = t % video.duration; if (playing) video.play().catch(() => {}); }, { once: true });
+  }
+  const attachSoon = () => { if ('requestIdleCallback' in window) requestIdleCallback(attach, { timeout: 1500 }); else setTimeout(attach, 400); };
+  if (document.readyState === 'complete') attachSoon(); else window.addEventListener('load', attachSoon, { once: true });
+  ['touchstart', 'wheel', 'scroll', 'keydown'].forEach((ev) => window.addEventListener(ev, attach, { once: true, passive: true }));
+
+  // errors: missing -light clip -> dark clip + CSS filter; anything else -> retry a few times (poster stays visible meanwhile)
+  let retries = 0;
+  video.addEventListener('error', () => {
+    if (!video.getAttribute('src')) return;                 // we released it ourselves
+    wrap.classList.remove('is-ready');
+    if (isLightTheme() && video.src.includes('-light')) { wrap.classList.add('needs-filter'); video.src = videoSrc().replace('-light', ''); return; }
+    if (retries++ < 3) setTimeout(() => loadClip(clipTime), 600 * retries);
   });
+  // clip swap (theme switch / recovery): guarded so rapid toggles and mid-load states can't break it
+  let clipTime = 0, swapToken = 0;
+  video.addEventListener('timeupdate', () => { if (video.readyState >= 2 && !video.seeking) clipTime = video.currentTime; });
+  function loadClip(resumeAt) {
+    const token = ++swapToken;
+    attached = true;
+    wrap.classList.remove('needs-filter', 'is-ready');   // poster shows while the new clip loads, no black gap
+    video.pause();
+    video.src = videoSrc();
+    video.load();
+    appliedRate = 1;
+    video.addEventListener('loadedmetadata', () => {
+      if (token !== swapToken) return;                   // a newer swap superseded this one
+      try { if (video.duration) video.currentTime = resumeAt % video.duration; } catch (e) {}
+      video.playbackRate = 1;
+      if (playing) video.play().catch(() => {});
+    }, { once: true });
+  }
+  addEventListener('quiter:theme', () => loadClip(clipTime));
   // Once the first frame is decoded, the black page takes over from the poster
   // (otherwise the poster would peek out around the edges when the clip is shifted/scaled).
   video.addEventListener('loadeddata', () => wrap.classList.add('is-ready'));   // CSS then hides the poster
   wrap.appendChild(video);
 
-    const samples = [];      // recent movements: { t: time, px: distance }
+  const samples = [];      // recent movements: { t: time, px: distance }
   let lastY = window.scrollY;
   let touchY = null;
   let drive = 0;           // target playback rate from the measured swipe speed
@@ -255,5 +286,26 @@ export function initBackground() {
       stop();
     }
   }
+
+  // Leaving the page (link, redirect, Back): free the hardware decoder immediately
+  function release() {
+    swapToken++;
+    stop();
+    try { video.removeAttribute('src'); video.load(); } catch (e) {}
+    wrap.classList.remove('is-ready');
+    attached = false;
+  }
+  // Back button / tab restore: the decoder may be gone, so reload from the last good frame
+  function recover() {
+    stop();
+    drive = 0; mid = 0; rate = 0; samples.length = 0;
+    wdTime = -1; wdStuck = 0; retries = 0;
+    loadClip(clipTime);
+  }
+  window.addEventListener('pagehide', release);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) recover(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && attached && (video.error || video.readyState < 2)) recover();
+  });
   requestAnimationFrame(frame);
 }
