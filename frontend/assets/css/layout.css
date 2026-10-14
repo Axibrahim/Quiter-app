@@ -1735,3 +1735,26 @@ body { min-height: 100vh; min-height: 100dvh; padding-left: var(--safe-left); pa
 .bluetab .upnext__list { border-top: 0; }
 .bluetab .upnext__row:last-child { border-bottom: 0; padding-bottom: 0; }
 .bluetab .tips.blue-note { margin: 0; }
+
+/* ===== First-visit intro: stars light in -> hero text -> flower slowly reveals ===== */
+
+/* hold the hero text until the splash lifts (and, on first visit, until the intro starts) */
+html.is-loading .hero .w,
+html.is-loading .fx-rise,
+html.intro-pending:not(.intro-play) .hero .w,
+html.intro-pending:not(.intro-play) .fx-rise { animation-play-state: paused; }
+
+/* beat 1 (0s): stars fade in */
+html.intro-pending:not(.intro-play) .site-gl { opacity: 0; }
+html.intro-pending.intro-play .site-gl.is-on { opacity: 1; transition: opacity 2s ease .1s; }
+
+/* beat 2 (~1s): hero words rise (the delays below count from the moment the intro starts) */
+html.intro-pending .hero .w { animation-delay: calc(1s + var(--i, 0) * 70ms); }
+html.intro-pending .fx-rise { animation-delay: calc(1s + var(--d, 0) * 90ms); }
+
+/* beat 3 (~2.4s): the flower slowly fades in and settles */
+html.intro-pending:not(.intro-play) .bg-video { opacity: 0; transform: scale(1.06); }
+html.intro-pending.intro-play .bg-video {
+  opacity: 1; transform: none;
+  transition: opacity 3.6s cubic-bezier(.22,.61,.36,1) 2.4s, transform 5s cubic-bezier(.22,.61,.36,1) 2.4s;
+}
