@@ -100,10 +100,11 @@ main > #cta-fallback::before, main > #cta-fallback::after { display: none; }
 .has-stack main > .hero.stack__layer { position: sticky; top: 0; z-index: 0; will-change: opacity; }
 .has-stack main > .hero.stack__layer { opacity: calc(1 - (var(--cover, 0) - .55) * 2.4); }
 .has-stack main > .hero.stack__layer .hero__content {
-  /* stays fully visible for the first ~30% of cover, then fades out by ~85% */
-  opacity: clamp(0, calc(1 - (var(--cover, 0) - .3) * 1.8), 1);
-  transform: translateY(calc(var(--cover, 0) * -1rem));
+  /* full strength for the first ~8% of cover (a small swipe), then gone by ~28%, before the frame reaches the text */
+  opacity: clamp(0, calc(1 - (var(--cover, 0) - .08) * 5), 1);
+  transform: translateY(calc(var(--cover, 0) * -2.2rem));
 }
+
 
 .has-stack main > .hero.stack__layer.is-buried { visibility: hidden; }   /* fully covered: stars + flower show through */
 
