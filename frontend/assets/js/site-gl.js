@@ -49,6 +49,12 @@ const VERT = /* glsl */ `
   uniform float uTwinkle;
   uniform float uWave;      // 0..1 progress of the section wave, -1 = idle
   uniform float uWaveDir;   // +1 = travels up (scrolling down), -1 = travels down
+  uniform vec2 uRes;        // canvas size, CSS px
+  uniform vec4 uHead;       // flower head: centre x, centre y, radius x, radius y (CSS px)
+  uniform vec4 uStem;       // flower stem: x1, y1, x2, y2 (CSS px)
+  uniform vec2 uStemFeather; // x = stem radius, y = edge softness (CSS px)
+  uniform float uHoleOn;    // 1 on the home page
+  varying float vHole;
   varying float vTw;
   varying float vTint;
   varying float vK;
@@ -64,6 +70,15 @@ const VERT = /* glsl */ `
       k = smoothstep(0.55, 0.0, abs(ndcY - front)) * sin(uWave * 3.14159);
       gl_Position.x += sin(ndcY * 5.0 + uWave * 6.0) * 0.012 * k;   // tiny ripple
     }
+    // flower mask: stars fade out over the flower (head + stem) and only shine around it
+    vec2 ndc = gl_Position.xy / gl_Position.w;
+    vec2 sp = vec2((ndc.x * 0.5 + 0.5) * uRes.x, (0.5 - ndc.y * 0.5) * uRes.y);
+    float fe = uStemFeather.y;
+    float hHole = smoothstep(1.0, 1.0 + fe / max(uHead.z, 1.0), length((sp - uHead.xy) / uHead.zw));
+    vec2 sa = uStem.xy, ab = uStem.zw - uStem.xy;
+    float tt = clamp(dot(sp - sa, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
+    float sHole = smoothstep(0.0, fe, length(sp - (sa + ab * tt)) - uStemFeather.x);
+    vHole = mix(1.0, hHole * sHole, uHoleOn);
     vK = k;
     vTw = tw;
     vTint = aTint;
@@ -75,6 +90,7 @@ const FRAG = /* glsl */ `
   uniform vec3 uBase;
   uniform vec3 uColor;
   uniform float uOpacity;
+  varying float vHole;
   varying float vTw;
   varying float vTint;
   varying float vK;
@@ -83,7 +99,7 @@ const FRAG = /* glsl */ `
     if (d > 1.0) discard;
     float core = smoothstep(0.38, 0.0, d);           // bright pinpoint
     float glow = pow(1.0 - d, 2.4);                  // soft halo
-    float a = (core * 0.95 + glow * 0.6) * vTw * uOpacity * (1.0 + vK * 1.1);
+    float a = (core * 0.95 + glow * 0.6) * vTw * uOpacity * (1.0 + vK * 1.1) * vHole;
     vec3 col = mix(uBase, uColor, vTint);            // base (white / indigo) <-> plan accent
     gl_FragColor = vec4(col, a);
     #include <colorspace_fragment>
@@ -157,6 +173,11 @@ export async function initSiteGL() {
       uTwinkle: { value: LOOK.twinkle },
       uWave: { value: -1 },
       uWaveDir: { value: 1 },
+      uRes: { value: new THREE.Vector2(1, 1) },
+      uHead: { value: new THREE.Vector4(0, 0, 1, 1) },
+      uStem: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uStemFeather: { value: new THREE.Vector2(10, 70) },
+      uHoleOn: { value: 0 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -187,6 +208,37 @@ export async function initSiteGL() {
     camera.updateProjectionMatrix();
     const visH = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     pts.scale.set(visH * camera.aspect * 1.35, visH * 1.35, 6);
+    U.uRes.value.set(w, h);
+    fitHole();
+  }
+
+  // ---- keep stars off the flower: find where it is on screen (CSS px) ----
+  // Fractions of the video picture, measured on the poster frames. Nudge these if the gap looks off:
+  //   hx/hy = head centre, hr/vr = head half-width/half-height, sx*/sy* = stem ends, sr = stem half-width.
+  const FLOWER = {
+    desk:  { hx: 0.515, hy: 0.430, hr: 0.200, vr: 0.160, sx1: 0.503, sy1: 0.50, sx2: 0.448, sy2: 1.02, sr: 0.032 },
+    phone: { hx: 0.520, hy: 0.429, hr: 0.275, vr: 0.158, sx1: 0.510, sy1: 0.51, sx2: 0.420, sy2: 1.02, sr: 0.040 },
+  };
+  let holeUntil = performance.now() + 10000;   // follow the flower while the intro reveal settles
+  function fitHole() {
+    const video = document.querySelector('.bg-video video');
+    if (!video || !document.querySelector('.hero')) { U.uHoleOn.value = 0; return; }
+    const r = video.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const phoneNow = matchMedia('(max-width: 860px)').matches;
+    const f = phoneNow ? FLOWER.phone : FLOWER.desk;
+    const iw = video.videoWidth || (phoneNow ? 800 : 1272), ih = video.videoHeight || (phoneNow ? 856 : 952);
+    let cw = r.width, ch = r.height, left = r.left, top = r.top;
+    if (getComputedStyle(video).objectFit !== 'fill') {   // desktop: object-fit cover, object-position 60% 50%
+      const sc = Math.max(r.width / iw, r.height / ih);
+      cw = iw * sc; ch = ih * sc;
+      left = r.left + (r.width - cw) * 0.6;
+      top = r.top + (r.height - ch) * 0.5;
+    }
+    U.uHead.value.set(left + f.hx * cw, top + f.hy * ch, f.hr * cw, f.vr * ch);
+    U.uStem.value.set(left + f.sx1 * cw, top + f.sy1 * ch, left + f.sx2 * cw, top + f.sy2 * ch);
+    U.uStemFeather.value.set(f.sr * cw, Math.max(40, 0.05 * cw));   // softness of the edge, px
+    U.uHoleOn.value = 1;
   }
 
   function tick(now) {
@@ -198,6 +250,7 @@ export async function initSiteGL() {
     const fps = small ? (now < fastUntil || idle ? 20 : 30) : (idle ? 30 : 60);
     if (now - last < 1000 / fps - 2) return;
     last = now;
+    if (now < holeUntil) fitHole();
 
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
 
@@ -277,6 +330,9 @@ export async function initSiteGL() {
     geo.attributes.aTint.needsUpdate = true;
   }
   addEventListener('quiter:theme', applyTheme);
+  addEventListener('resize', fitHole);
+  addEventListener('quiter:theme', () => setTimeout(fitHole, 400));
+  document.addEventListener('loadedmetadata', fitHole, true);
     // crossing into a new home section: light sweeps through the stars and the accent colour moves on
   addEventListener('quiter:section', (e) => {
     const { index = 0, dir = 1 } = e.detail || {};
