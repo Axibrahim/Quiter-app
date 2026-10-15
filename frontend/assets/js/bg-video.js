@@ -122,8 +122,8 @@ export function initBackground() {
     attached = true;
     video.src = videoSrc();
   }
-  const attachSoon = () => { if ('requestIdleCallback' in window) requestIdleCallback(attach, { timeout: 1500 }); else setTimeout(attach, 400); };
-  if (document.readyState === 'complete') attachSoon(); else window.addEventListener('load', attachSoon, { once: true });
+  attach();
+
   ['touchstart', 'wheel', 'scroll', 'keydown'].forEach((ev) => window.addEventListener(ev, attach, { once: true, passive: true }));
 
   // errors: missing -light clip -> dark clip + CSS filter; anything else -> retry a few times (poster stays visible meanwhile)
