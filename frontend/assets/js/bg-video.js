@@ -123,8 +123,26 @@ export function initBackground() {
     video.src = videoSrc();
   }
   attach();
+  
+  // Prime the decoder: iOS ignores preload="auto", so the clip would only start loading at the first swipe (= the delay).
+  // Play it muted at a crawl for a moment so the first seconds are buffered and decoded, then pause. A swipe then starts instantly.
+  let primed = false;
+  function prime() {
+    if (primed || !video.getAttribute('src')) return;
+    primed = true;
+    video.playbackRate = 0.0625;
+    appliedRate = 0.0625;
+    const p = video.play();
+    if (p && p.then) {
+      p.then(() => setTimeout(() => { if (!playing) video.pause(); }, 400)).catch(() => { primed = false; });
+    }
+  }
+  video.addEventListener('loadedmetadata', prime);
 
-  ['touchstart', 'wheel', 'scroll', 'keydown'].forEach((ev) => window.addEventListener(ev, attach, { once: true, passive: true }));
+  ['touchstart', 'wheel', 'scroll', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { attach(); prime(); }, { once: true, passive: true }));
+
+
+
 
   // errors: missing -light clip -> dark clip + CSS filter; anything else -> retry a few times (poster stays visible meanwhile)
   let retries = 0;
@@ -140,6 +158,7 @@ export function initBackground() {
   function loadClip(resumeAt) {
     const token = ++swapToken;
     attached = true;
+    primed = true;                                       // theme switch / recovery: the user is already interacting, no priming
     wrap.classList.remove('needs-filter', 'is-ready');   // poster shows while the new clip loads, no black gap
     video.pause();
     video.src = videoSrc();
